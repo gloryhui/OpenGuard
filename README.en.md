@@ -65,6 +65,12 @@ make clean verify
 
 The universal app is written to `build/OpenGuard.app`. Local builds use ad-hoc signing; public binaries should be signed with an Apple Developer ID and notarized.
 
+To create a drag-to-Applications DMG, a fallback ZIP, and SHA-256 checksums:
+
+```sh
+make clean package
+```
+
 To inspect one extension:
 
 ```sh

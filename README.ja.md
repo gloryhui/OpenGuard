@@ -53,6 +53,12 @@ make clean verify
 
 Universal App は `build/OpenGuard.app` に生成されます。
 
+Applications にドラッグできる DMG、予備の ZIP、SHA-256 チェックサムを生成します。
+
+```sh
+make clean package
+```
+
 ## プライバシー
 
 テレメトリ、広告、追跡はありません。ルール、ファイル名、ファイル一覧、アプリ一覧をアップロードしません。唯一の通信は GitHub API から公開 Release メタデータを取得するリクエストです。

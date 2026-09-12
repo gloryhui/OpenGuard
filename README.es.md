@@ -53,6 +53,12 @@ make clean verify
 
 La aplicación universal se genera en `build/OpenGuard.app`.
 
+Para crear un DMG instalable mediante arrastre, un ZIP alternativo y las sumas SHA-256:
+
+```sh
+make clean package
+```
+
 ## Privacidad
 
 OpenGuard no incluye telemetría, publicidad ni seguimiento. No sube reglas, nombres de archivos, listas de archivos ni la lista de aplicaciones. Su única solicitud de red obtiene metadatos públicos de Releases mediante la API de GitHub.

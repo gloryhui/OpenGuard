@@ -2,4 +2,6 @@
 set -eu
 cd "$(dirname "$0")/.."
 make clean package
-echo "Release archive: $(pwd)/dist/OpenGuard-1.1.0-universal.zip"
+release_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)
+echo "Release artifacts:"
+find "$(pwd)/dist" -maxdepth 1 -type f \( -name "OpenGuard-${release_version}-universal.*" -o -name 'SHA256SUMS.txt' \) -print

@@ -53,6 +53,12 @@ make clean verify
 
 유니버설 앱은 `build/OpenGuard.app`에 생성됩니다.
 
+Applications로 드래그할 수 있는 DMG, 예비 ZIP 및 SHA-256 체크섬을 생성합니다.
+
+```sh
+make clean package
+```
+
 ## 개인정보 보호
 
 원격 측정, 광고, 추적이 없습니다. 규칙, 파일 이름, 파일 목록 또는 앱 목록을 업로드하지 않습니다. 유일한 네트워크 요청은 GitHub API에서 공개 Release 메타데이터를 가져오는 것입니다.

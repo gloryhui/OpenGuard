@@ -67,6 +67,12 @@ make clean verify
 
 生成的通用 App 位于 `build/OpenGuard.app`。本地构建使用 ad-hoc 签名；公开分发前应使用 Apple Developer ID 签名并完成公证。
 
+生成可拖入“应用程序”的 DMG、备用 ZIP 和 SHA-256 校验文件：
+
+```sh
+make clean package
+```
+
 诊断某个后缀：
 
 ```sh

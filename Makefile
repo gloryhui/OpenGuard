@@ -1,9 +1,14 @@
 APP_NAME := OpenGuard
+VERSION := $(shell /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)
 BUILD_DIR := build
 APP_DIR := $(BUILD_DIR)/$(APP_NAME).app
 CONTENTS_DIR := $(APP_DIR)/Contents
 MACOS_DIR := $(CONTENTS_DIR)/MacOS
 RESOURCES_DIR := $(CONTENTS_DIR)/Resources
+DMG_STAGING_DIR := $(BUILD_DIR)/dmg
+ZIP_PATH := dist/$(APP_NAME)-$(VERSION)-universal.zip
+DMG_PATH := dist/$(APP_NAME)-$(VERSION)-universal.dmg
+CHECKSUM_PATH := dist/SHA256SUMS.txt
 SOURCES := $(wildcard Sources/*.m)
 HEADERS := $(wildcard Sources/*.h)
 MIN_MACOS := 10.13
@@ -33,8 +38,14 @@ verify: app
 	@"$(MACOS_DIR)/$(APP_NAME)" --verify-content
 
 package: verify
-	@mkdir -p dist
-	ditto -c -k --sequesterRsrc --keepParent "$(APP_DIR)" "dist/$(APP_NAME)-1.1.0-universal.zip"
+	@mkdir -p dist "$(DMG_STAGING_DIR)"
+	@rm -rf "$(DMG_STAGING_DIR)/$(APP_NAME).app" "$(DMG_STAGING_DIR)/Applications"
+	@ditto "$(APP_DIR)" "$(DMG_STAGING_DIR)/$(APP_NAME).app"
+	@ln -s /Applications "$(DMG_STAGING_DIR)/Applications"
+	ditto -c -k --sequesterRsrc --keepParent "$(APP_DIR)" "$(ZIP_PATH)"
+	hdiutil create -volname "$(APP_NAME) $(VERSION)" -srcfolder "$(DMG_STAGING_DIR)" \
+		-ov -format UDZO "$(DMG_PATH)"
+	@cd dist && shasum -a 256 "$(notdir $(ZIP_PATH))" "$(notdir $(DMG_PATH))" | tee "$(notdir $(CHECKSUM_PATH))"
 
 run: app
 	open "$(APP_DIR)"
