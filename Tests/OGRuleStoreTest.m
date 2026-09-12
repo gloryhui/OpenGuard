@@ -60,7 +60,26 @@ int main(void) {
             [store containsRuleWithExtension:@"aaa"] && [store containsRuleWithExtension:@"bbb"] &&
             [store containsRuleWithExtension:@"foo"] && [store containsRuleWithExtension:@"bar"];
 
-        BOOL passed = migrated && added && movedIntoGroup && addedSecondRule && reorderedInGroup && reordered &&
+        NSString *draftGroup = store.groups.firstObject[OGGroupIdentifierKey];
+        NSUInteger effectiveCount = store.effectiveRules.count;
+        NSString *draftID = [store addDraftRuleToGroup:draftGroup];
+        BOOL draftInactive = store.effectiveRules.count == effectiveCount;
+        NSDictionary *application = @{OGRuleBundleIdentifierKey: @"example.editor", OGRuleApplicationNameKey: @"Editor"};
+        [store setApplication:application forExtension:@"" inGroup:draftGroup];
+        draftInactive = draftInactive && store.effectiveRules.count == effectiveCount;
+        BOOL edited = [store updateRule:draftID extension:@".OGTEST" name:@"测试名称"] &&
+            ruleHasBundle(store, @"ogtest", @"example.editor");
+        BOOL rejectsDuplicate = ![store updateRule:draftID extension:@"aaa" name:@"Duplicate"] &&
+            [[store ruleWithIdentifier:draftID][OGRuleExtensionKey] isEqualToString:@"ogtest"];
+        BOOL rejectsInvalid = ![store updateRule:draftID extension:@"bad/path" name:@"Invalid"];
+        OGRuleStore *reloaded = [[OGRuleStore alloc] initWithUserDefaults:defaults];
+        BOOL persisted = [[reloaded ruleWithIdentifier:draftID][OGRuleNameKey] isEqualToString:@"测试名称"];
+        [store removeRule:draftID];
+        BOOL removedOnlyTarget = [store ruleWithIdentifier:draftID] == nil && [store containsRuleWithExtension:@"aaa"];
+        BOOL editingPassed = draftInactive && edited && rejectsDuplicate && rejectsInvalid && persisted && removedOnlyTarget;
+        printf("rule_edit_delete_persistence=%s\n", editingPassed ? "yes" : "no");
+
+        BOOL passed = editingPassed && migrated && added && movedIntoGroup && addedSecondRule && reorderedInGroup && reordered &&
             rootMovePreservedRule &&
             rulesMovedToRoot && resetPreservedRules;
         printf("migration=%s\nadd_and_cross_group_move=%s\nin_group_and_root_reorder=%s\n"

@@ -33,6 +33,8 @@ OpenGuard mantiene la elección del usuario sin un servicio pesado, componentes 
 
 1. Mueve `OpenGuard.app` a `/Applications`.
 2. Usa los botones superiores para añadir grupos o reglas. Arrastra filas para ordenar o mover reglas entre grupos y la raíz.
+
+   Las reglas se añaden directamente al grupo seleccionado. Edita la extensión y el nombre visible y confirma con la marca de verificación o cancela con la cruz. Las filas normales muestran lápiz y papelera; también puedes editar o eliminar desde el menú contextual. Cancelar conserva la fila y descarta los cambios. Las reglas vacías no participan en la protección.
 3. Usa `…` en un grupo para elegir una aplicación común, o en una extensión para crear una excepción. Haz clic derecho para renombrar un grupo.
 4. Si quieres, activa el inicio de sesión y mantén la restauración automática. La inicialización de grupos está dentro del menú “Ajustes” y pide confirmación.
 

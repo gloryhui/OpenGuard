@@ -20,13 +20,10 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 @property NSButton *removeGroupButton;
 @property NSButton *checkUpdatesButton;
 @property NSMenu *outlineMenu;
-@property NSView *ruleEditor;
-@property NSLayoutConstraint *ruleEditorHeightConstraint;
 @property NSTextField *ruleExtensionField;
 @property NSTextField *ruleNameField;
-@property NSTextField *ruleDestinationLabel;
 @property (nonatomic, weak) NSTextField *editingGroupField;
-@property (copy, nullable) NSString *pendingRuleGroupIdentifier;
+@property (copy, nullable) NSString *editingRuleIdentifier;
 @property NSTimer *timer;
 @property OGUpdateChecker *updateChecker;
 @property (copy) NSDictionary<NSString *, NSString *> *statusByExtension;
@@ -156,12 +153,12 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 }
 
 - (void)buildWindow {
-    self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 940, 620)
+    self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 1080, 620)
                                               styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
                                                          NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable)
                                                 backing:NSBackingStoreBuffered defer:NO];
     self.window.title = @"OpenGuard";
-    self.window.minSize = NSMakeSize(800, 520);
+    self.window.minSize = NSMakeSize(1000, 520);
     self.window.releasedWhenClosed = NO;
     [self.window center];
     NSView *content = self.window.contentView;
@@ -212,8 +209,20 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
     statusColumn.title = [self.language text:@"status"];
     statusColumn.width = 170;
     [self.outlineView addTableColumn:typeColumn];
+    typeColumn.width = 205;
+    NSTableColumn *nameColumn = [[NSTableColumn alloc] initWithIdentifier:@"displayName"];
+    nameColumn.title = [self.language text:@"display_name"];
+    nameColumn.width = 180;
+    [self.outlineView addTableColumn:nameColumn];
     [self.outlineView addTableColumn:applicationColumn];
+    applicationColumn.width = 245;
     [self.outlineView addTableColumn:statusColumn];
+    NSTableColumn *actionsColumn = [[NSTableColumn alloc] initWithIdentifier:@"actions"];
+    actionsColumn.title = [self.language text:@"actions"];
+    actionsColumn.width = 80;
+    actionsColumn.minWidth = 80;
+    actionsColumn.maxWidth = 80;
+    [self.outlineView addTableColumn:actionsColumn];
     self.outlineView.outlineTableColumn = typeColumn;
     scroll.documentView = self.outlineView;
 
@@ -245,33 +254,6 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
                                                                      options:NSLayoutFormatAlignAllCenterY
                                                                      metrics:nil views:toolbarViews]];
 
-    self.ruleEditor = [[NSView alloc] initWithFrame:NSZeroRect];
-    self.ruleEditor.translatesAutoresizingMaskIntoConstraints = NO;
-    self.ruleEditor.hidden = YES;
-    self.ruleDestinationLabel = [self label:@"" font:[NSFont systemFontOfSize:12]];
-    self.ruleDestinationLabel.textColor = [NSColor secondaryLabelColor];
-    self.ruleExtensionField = [[NSTextField alloc] initWithFrame:NSZeroRect];
-    self.ruleExtensionField.translatesAutoresizingMaskIntoConstraints = NO;
-    self.ruleExtensionField.placeholderString = [self.language text:@"rule_extension_placeholder"];
-    self.ruleNameField = [[NSTextField alloc] initWithFrame:NSZeroRect];
-    self.ruleNameField.translatesAutoresizingMaskIntoConstraints = NO;
-    self.ruleNameField.placeholderString = [self.language text:@"rule_name_placeholder"];
-    self.ruleNameField.target = self;
-    self.ruleNameField.action = @selector(confirmAddRule:);
-    NSButton *cancelRule = [self button:[self.language text:@"cancel"] action:@selector(cancelAddRule:)];
-    NSButton *confirmRule = [self button:[self.language text:@"add"] action:@selector(confirmAddRule:)];
-    for (NSView *view in @[self.ruleDestinationLabel, self.ruleExtensionField, self.ruleNameField,
-                           cancelRule, confirmRule]) [self.ruleEditor addSubview:view];
-    NSDictionary *editorViews = NSDictionaryOfVariableBindings(_ruleDestinationLabel, _ruleExtensionField,
-                                                                 _ruleNameField, cancelRule, confirmRule);
-    [self.ruleEditor addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:
-                                     @"H:|[_ruleDestinationLabel(>=130)]-12-[_ruleExtensionField(100)]-8-[_ruleNameField(180)]-(>=8)-[cancelRule]-8-[confirmRule]|"
-                                                                            options:NSLayoutFormatAlignAllCenterY
-                                                                            metrics:nil views:editorViews]];
-    [self.ruleEditor addConstraint:[NSLayoutConstraint constraintWithItem:self.ruleExtensionField
-                                                                 attribute:NSLayoutAttributeCenterY
-                                                                 relatedBy:NSLayoutRelationEqual toItem:self.ruleEditor
-                                                                 attribute:NSLayoutAttributeCenterY multiplier:1 constant:0]];
 
     NSButton *apply = [self button:[self.language text:@"apply_all"] action:@selector(applyNow:)];
     self.monitoringCheckbox = [NSButton checkboxWithTitle:[self.language text:@"monitor_auto"] target:self
@@ -283,15 +265,9 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
     self.loginCheckbox.translatesAutoresizingMaskIntoConstraints = NO;
     self.loginCheckbox.state = [OGLaunchAgent isEnabled] ? NSControlStateValueOn : NSControlStateValueOff;
 
-    for (NSView *view in @[title, toolbar, self.summaryLabel, self.ruleEditor, languageLabel, languagePopup,
+    for (NSView *view in @[title, toolbar, self.summaryLabel, languageLabel, languagePopup,
                            scroll, apply, self.monitoringCheckbox, self.loginCheckbox]) [content addSubview:view];
-    self.ruleEditorHeightConstraint = [NSLayoutConstraint constraintWithItem:self.ruleEditor
-                                                                    attribute:NSLayoutAttributeHeight
-                                                                    relatedBy:NSLayoutRelationEqual toItem:nil
-                                                                    attribute:NSLayoutAttributeNotAnAttribute
-                                                                   multiplier:1 constant:0];
-    [self.ruleEditor addConstraint:self.ruleEditorHeightConstraint];
-    NSDictionary *views = NSDictionaryOfVariableBindings(title, toolbar, _summaryLabel, _ruleEditor,
+    NSDictionary *views = NSDictionaryOfVariableBindings(title, toolbar, _summaryLabel,
                                                            languageLabel, languagePopup, scroll, apply,
                                                            _monitoringCheckbox, _loginCheckbox);
     [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[title]-(>=20)-[languageLabel]-6-[languagePopup]-24-|"
@@ -300,15 +276,13 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
                                                                     options:0 metrics:nil views:views]];
     [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[toolbar]-24-|"
                                                                     options:0 metrics:nil views:views]];
-    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[_ruleEditor]-24-|"
-                                                                    options:0 metrics:nil views:views]];
     [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[scroll]-24-|"
                                                                     options:0 metrics:nil views:views]];
     [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[_monitoringCheckbox]-(>=12)-[apply]-24-|"
                                                                     options:NSLayoutFormatAlignAllCenterY metrics:nil views:views]];
     [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[_loginCheckbox]-24-|"
                                                                     options:0 metrics:nil views:views]];
-    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|-18-[title]-10-[toolbar(30)]-6-[_summaryLabel]-8-[_ruleEditor]-8-[scroll]-12-[_monitoringCheckbox]-6-[_loginCheckbox]-16-|"
+    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|-18-[title]-10-[toolbar(30)]-6-[_summaryLabel]-12-[scroll]-12-[_monitoringCheckbox]-6-[_loginCheckbox]-16-|"
                                                                     options:0 metrics:nil views:views]];
     [self.outlineView reloadData];
     [self expandAllGroups];
@@ -352,12 +326,19 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 
 - (NSView *)outlineView:(NSOutlineView *)outlineView viewForTableColumn:(NSTableColumn *)column item:(NSDictionary *)item {
     BOOL group = [self isGroup:item];
+    BOOL editing = !group && [item[OGRuleIdentifierKey] isEqualToString:self.editingRuleIdentifier];
+    if ([column.identifier isEqualToString:@"actions"]) return group ? nil : [self actionsCellForRule:item];
+    if (editing && [column.identifier isEqualToString:@"filetype"]) return self.ruleExtensionField;
+    if (editing && [column.identifier isEqualToString:@"displayName"]) return self.ruleNameField;
+    if ([column.identifier isEqualToString:@"displayName"]) {
+        return [NSTextField labelWithString:group ? @"" : ([item[OGRuleNameKey] length] ? item[OGRuleNameKey] : [self.language text:@"new_rule"])];
+    }
     if ([column.identifier isEqualToString:@"application"]) return [self applicationCellForItem:item group:group];
     NSTextField *cell = [NSTextField labelWithString:@""];
     cell.lineBreakMode = NSLineBreakByTruncatingTail;
     if ([column.identifier isEqualToString:@"filetype"]) {
         cell.stringValue = group ? [self titleForGroup:item]
-                                 : [NSString stringWithFormat:@".%@  —  %@", item[OGRuleExtensionKey], item[OGRuleNameKey]];
+                                 : ([item[OGRuleExtensionKey] length] ? [@"." stringByAppendingString:item[OGRuleExtensionKey]] : @"—");
         if (group) {
             cell.font = [NSFont boldSystemFontOfSize:13];
             cell.editable = NO;
@@ -406,7 +387,10 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 }
 
 - (NSString *)applicationTextForGroup:(NSDictionary *)group {
-    NSArray<NSDictionary *> *items = group[OGGroupItemsKey] ?: @[];
+    NSArray<NSDictionary *> *items = [group[OGGroupItemsKey] filteredArrayUsingPredicate:
+        [NSPredicate predicateWithBlock:^BOOL(NSDictionary *rule, NSDictionary *bindings) {
+            return [rule[OGRuleExtensionKey] length] > 0;
+        }]] ?: @[];
     if (items.count == 0 && [group[OGRuleBundleIdentifierKey] length]) {
         NSString *name = group[OGRuleApplicationNameKey];
         return name.length ? name : group[OGRuleBundleIdentifierKey];
@@ -438,6 +422,7 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 - (NSString *)groupStatus:(NSDictionary *)group {
     NSUInteger configured = 0, protected = 0;
     for (NSDictionary *item in group[OGGroupItemsKey]) {
+        if (![item[OGRuleExtensionKey] length]) continue;
         if (item[OGRuleBundleIdentifierKey] || group[OGRuleBundleIdentifierKey]) configured++;
         NSString *status = self.statusByExtension[item[OGRuleExtensionKey]];
         if ([status isEqualToString:[self.language text:@"protected"]] ||
@@ -462,6 +447,7 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 
 - (id<NSPasteboardWriting>)outlineView:(NSOutlineView *)outlineView
                pasteboardWriterForItem:(NSDictionary *)item {
+    if (self.editingRuleIdentifier || (![self isGroup:item] && ![item[OGRuleExtensionKey] length])) return nil;
     NSMutableDictionary *payload = [NSMutableDictionary dictionary];
     if ([self isGroup:item]) {
         payload[@"kind"] = @"group";
@@ -534,6 +520,7 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 #pragma mark - Group and application actions
 
 - (void)beginEditingGroupAtRow:(NSInteger)row {
+    if (self.editingRuleIdentifier) { [self focusRuleEditor]; return; }
     if (row < 0 || row >= self.outlineView.numberOfRows) return;
     NSDictionary *item = [self.outlineView itemAtRow:row];
     if (![self isGroup:item]) return;
@@ -558,16 +545,33 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 
 - (void)menuNeedsUpdate:(NSMenu *)menu {
     if (menu != self.outlineMenu) return;
+    [menu removeAllItems];
     NSInteger row = [self contextRow];
-    NSDictionary *group = [self contextGroup];
-    if (group && row >= 0) {
+    NSDictionary *item = row >= 0 ? [self.outlineView itemAtRow:row] : nil;
+    if (!item) return;
+    BOOL group = [self isGroup:item];
+    BOOL editing = !group && [item[OGRuleIdentifierKey] isEqualToString:self.editingRuleIdentifier];
+    NSArray *keys = group ? @[@"rename_group", @"remove_group"]
+                         : (editing ? @[@"confirm", @"cancel"] : @[@"edit_rule", @"delete_rule"]);
+    SEL first = group ? @selector(renameGroup:) : (editing ? @selector(confirmAddRule:) : @selector(editRule:));
+    SEL second = group ? @selector(deleteGroup:) : (editing ? @selector(cancelAddRule:) : @selector(deleteRule:));
+    NSMenuItem *firstItem = [menu addItemWithTitle:[self.language text:keys[0]] action:first keyEquivalent:@""];
+    NSMenuItem *secondItem = [menu addItemWithTitle:[self.language text:keys[1]] action:second keyEquivalent:@""];
+    menu.autoenablesItems = NO;
+    for (NSMenuItem *entry in menu.itemArray) {
+        entry.target = self;
+        entry.enabled = !self.editingRuleIdentifier || editing;
+    }
+    firstItem.image = [self ruleActionImage:editing ? @"confirm" : @"edit"];
+    secondItem.image = [self ruleActionImage:editing ? @"cancel" : @"delete"];
+    if (!self.editingRuleIdentifier) {
         [self.outlineView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row]
                      byExtendingSelection:NO];
     }
-    for (NSMenuItem *item in menu.itemArray) item.enabled = group != nil;
 }
 
 - (void)addGroup:(id)sender {
+    if (self.editingRuleIdentifier) { [self focusRuleEditor]; return; }
     NSString *identifier = [self.store addGroupWithTitle:[self.language text:@"new_group"]];
     NSSet<NSString *> *expanded = [[self expandedGroupIdentifiers] setByAddingObject:identifier];
     [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
@@ -609,57 +613,175 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
     [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
 }
 
+- (NSImage *)ruleActionImage:(NSString *)kind {
+    NSImage *image = [NSImage imageWithSize:NSMakeSize(18, 18) flipped:NO drawingHandler:^BOOL(NSRect rect) {
+        [NSColor.labelColor setStroke];
+        NSBezierPath *path = [NSBezierPath bezierPath];
+        path.lineWidth = 1.5;
+        path.lineCapStyle = NSRoundLineCapStyle;
+        path.lineJoinStyle = NSRoundLineJoinStyle;
+        if ([kind isEqualToString:@"edit"]) {
+            [path moveToPoint:NSMakePoint(3, 3)]; [path lineToPoint:NSMakePoint(4, 7)];
+            [path lineToPoint:NSMakePoint(12, 15)]; [path lineToPoint:NSMakePoint(15, 12)];
+            [path lineToPoint:NSMakePoint(7, 4)]; [path closePath];
+            [path moveToPoint:NSMakePoint(10, 13)]; [path lineToPoint:NSMakePoint(13, 10)];
+        } else if ([kind isEqualToString:@"delete"]) {
+            [path moveToPoint:NSMakePoint(3, 13)]; [path lineToPoint:NSMakePoint(15, 13)];
+            [path moveToPoint:NSMakePoint(6, 13)]; [path lineToPoint:NSMakePoint(6, 16)];
+            [path lineToPoint:NSMakePoint(12, 16)]; [path lineToPoint:NSMakePoint(12, 13)];
+            [path moveToPoint:NSMakePoint(4, 11)]; [path lineToPoint:NSMakePoint(5, 2)];
+            [path lineToPoint:NSMakePoint(13, 2)]; [path lineToPoint:NSMakePoint(14, 11)];
+            [path moveToPoint:NSMakePoint(7, 10)]; [path lineToPoint:NSMakePoint(7.5, 5)];
+            [path moveToPoint:NSMakePoint(11, 10)]; [path lineToPoint:NSMakePoint(10.5, 5)];
+        } else if ([kind isEqualToString:@"confirm"]) {
+            [path moveToPoint:NSMakePoint(3, 9)]; [path lineToPoint:NSMakePoint(7, 5)];
+            [path lineToPoint:NSMakePoint(15, 13)];
+        } else {
+            [path moveToPoint:NSMakePoint(4, 4)]; [path lineToPoint:NSMakePoint(14, 14)];
+            [path moveToPoint:NSMakePoint(4, 14)]; [path lineToPoint:NSMakePoint(14, 4)];
+        }
+        [path stroke];
+        return YES;
+    }];
+    image.template = YES;
+    return image;
+}
+
+- (NSView *)actionsCellForRule:(NSDictionary *)rule {
+    BOOL editing = [rule[OGRuleIdentifierKey] isEqualToString:self.editingRuleIdentifier];
+    NSView *container = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 80, 28)];
+    NSArray *icons = editing ? @[@"confirm", @"cancel"] : @[@"edit", @"delete"];
+    NSArray *tips = editing ? @[@"confirm", @"cancel"] : @[@"edit_rule", @"delete_rule"];
+    for (NSUInteger i = 0; i < 2; i++) {
+        SEL action = editing ? (i == 0 ? @selector(confirmAddRule:) : @selector(cancelAddRule:))
+                             : (i == 0 ? @selector(editRule:) : @selector(deleteRule:));
+        NSButton *button = [NSButton buttonWithImage:[self ruleActionImage:icons[i]] target:self action:action];
+        button.frame = NSMakeRect(4 + i * 34, 1, 30, 26);
+        button.bordered = NO;
+        button.imagePosition = NSImageOnly;
+        button.toolTip = [self.language text:tips[i]];
+        [button setAccessibilityLabel:button.toolTip];
+        button.enabled = !self.editingRuleIdentifier || editing;
+        [container addSubview:button];
+    }
+    return container;
+}
+
+- (NSDictionary *)ruleForAction:(id)sender {
+    NSInteger row = [sender isKindOfClass:NSMenuItem.class] ? [self contextRow]
+        : [self.outlineView rowForView:sender];
+    NSDictionary *item = row >= 0 ? [self.outlineView itemAtRow:row] : nil;
+    return item && ![self isGroup:item] ? item : nil;
+}
+
+- (void)focusRuleEditor {
+    NSDictionary *rule = [self.store ruleWithIdentifier:self.editingRuleIdentifier];
+    NSInteger row = [self.outlineView rowForItem:rule];
+    if (row < 0) return;
+    [self.outlineView selectRowIndexes:[NSIndexSet indexSetWithIndex:row] byExtendingSelection:NO];
+    [self.outlineView scrollRowToVisible:row];
+    [self.outlineView layoutSubtreeIfNeeded];
+    [self.outlineView viewAtColumn:0 row:row makeIfNecessary:YES];
+    [self.outlineView viewAtColumn:1 row:row makeIfNecessary:YES];
+    [self.window makeFirstResponder:self.ruleExtensionField];
+}
+
+- (void)beginEditingRule:(NSString *)identifier {
+    if (self.editingRuleIdentifier) { [self focusRuleEditor]; return; }
+    [self.window makeFirstResponder:self.outlineView];
+    NSDictionary *rule = [self.store ruleWithIdentifier:identifier];
+    if (!rule) return;
+    self.editingRuleIdentifier = identifier;
+    self.ruleExtensionField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 180, 24)];
+    self.ruleNameField = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 180, 24)];
+    self.ruleExtensionField.placeholderString = [self.language text:@"rule_extension_placeholder"];
+    self.ruleNameField.placeholderString = [self.language text:@"rule_name_placeholder"];
+    self.ruleExtensionField.stringValue = rule[OGRuleExtensionKey] ?: @"";
+    self.ruleNameField.stringValue = rule[OGRuleNameKey] ?: @"";
+    self.ruleExtensionField.nextKeyView = self.ruleNameField;
+    for (NSTextField *field in @[self.ruleExtensionField, self.ruleNameField]) {
+        field.font = [NSFont systemFontOfSize:13];
+        field.focusRingType = NSFocusRingTypeExterior;
+        [field setAccessibilityLabel:field.placeholderString];
+    }
+    NSSet *expanded = [self expandedGroupIdentifiers];
+    [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
+    [self focusRuleEditor];
+}
+
+- (BOOL)outlineView:(NSOutlineView *)outlineView shouldCollapseItem:(NSDictionary *)item {
+    if (!self.editingRuleIdentifier) return YES;
+    for (NSDictionary *rule in item[OGGroupItemsKey]) {
+        if ([rule[OGRuleIdentifierKey] isEqualToString:self.editingRuleIdentifier]) return NO;
+    }
+    return YES;
+}
+
 - (void)showRuleEditor:(id)sender {
+    if (self.editingRuleIdentifier) { [self focusRuleEditor]; return; }
     NSInteger row = self.outlineView.selectedRow;
     NSDictionary *selectedItem = row >= 0 ? [self.outlineView itemAtRow:row] : nil;
     NSDictionary *group = [self isGroup:selectedItem] ? selectedItem
         : (selectedItem ? [self.outlineView parentForItem:selectedItem] : nil);
-    self.pendingRuleGroupIdentifier = group[OGGroupIdentifierKey];
-    NSString *destination = group ? [self titleForGroup:group] : [self.language text:@"ungrouped"];
-    self.ruleDestinationLabel.stringValue = [NSString stringWithFormat:
-                                              [self.language text:@"add_rule_destination"], destination];
-    self.ruleExtensionField.stringValue = @"";
-    self.ruleNameField.stringValue = @"";
-    self.ruleEditor.hidden = NO;
-    self.ruleEditorHeightConstraint.constant = 34;
-    [self.window.contentView layoutSubtreeIfNeeded];
-    [self.window makeFirstResponder:self.ruleExtensionField];
+    NSString *groupIdentifier = group[OGGroupIdentifierKey];
+    [self.window makeFirstResponder:self.outlineView];
+    NSSet *expanded = [self expandedGroupIdentifiers];
+    if (groupIdentifier) expanded = [expanded setByAddingObject:groupIdentifier];
+    NSString *identifier = [self.store addDraftRuleToGroup:groupIdentifier];
+    [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
+    [self beginEditingRule:identifier];
+    [self refreshAndRepair:NO];
+}
+
+- (void)editRule:(id)sender {
+    NSDictionary *rule = [self ruleForAction:sender];
+    if (rule) [self beginEditingRule:rule[OGRuleIdentifierKey]];
 }
 
 - (void)cancelAddRule:(id)sender {
-    self.ruleEditor.hidden = YES;
-    self.ruleEditorHeightConstraint.constant = 0;
-    self.pendingRuleGroupIdentifier = nil;
+    if (!self.editingRuleIdentifier) return;
+    NSString *identifier = self.editingRuleIdentifier;
+    [self.window makeFirstResponder:self.outlineView];
+    NSSet *expanded = [self expandedGroupIdentifiers];
+    self.editingRuleIdentifier = nil;
+    self.ruleExtensionField = nil;
+    self.ruleNameField = nil;
+    [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
+    NSInteger row = [self.outlineView rowForItem:[self.store ruleWithIdentifier:identifier]];
+    if (row >= 0) [self.outlineView selectRowIndexes:[NSIndexSet indexSetWithIndex:row] byExtendingSelection:NO];
+    [self refreshAndRepair:NO];
 }
 
 - (void)confirmAddRule:(id)sender {
+    if (!self.editingRuleIdentifier) return;
+    [self.window makeFirstResponder:self.outlineView];
     NSString *extension = [[self.ruleExtensionField.stringValue
-                            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
-                           lowercaseString];
+        stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] lowercaseString];
     while ([extension hasPrefix:@"."]) extension = [extension substringFromIndex:1];
-    NSCharacterSet *invalidCharacters = [NSCharacterSet characterSetWithCharactersInString:@"./:\\"];
-    if (!extension.length || extension.length > 32 ||
-        [extension rangeOfCharacterFromSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]].location != NSNotFound ||
-        [extension rangeOfCharacterFromSet:invalidCharacters].location != NSNotFound) {
-        [self showError:[self.language text:@"invalid_extension"]];
-        return;
-    }
-    if ([self.store containsRuleWithExtension:extension]) {
+    NSDictionary *original = [self.store ruleWithIdentifier:self.editingRuleIdentifier];
+    if (![extension isEqualToString:original[OGRuleExtensionKey]] && [self.store containsRuleWithExtension:extension]) {
         [self showError:[NSString stringWithFormat:[self.language text:@"duplicate_rule"], extension]];
         return;
     }
-    NSSet<NSString *> *expanded = [self expandedGroupIdentifiers];
-    if (self.pendingRuleGroupIdentifier) {
-        expanded = [expanded setByAddingObject:self.pendingRuleGroupIdentifier];
+    if (![self.store updateRule:self.editingRuleIdentifier extension:extension name:self.ruleNameField.stringValue]) {
+        [self showError:[self.language text:@"invalid_extension"]];
+        return;
     }
-    if (![self.store addRuleWithExtension:extension name:self.ruleNameField.stringValue
-                                  toGroup:self.pendingRuleGroupIdentifier]) return;
     [self cancelAddRule:nil];
+}
+
+- (void)deleteRule:(id)sender {
+    if (self.editingRuleIdentifier) { [self focusRuleEditor]; return; }
+    NSDictionary *rule = [self ruleForAction:sender];
+    if (!rule) return;
+    NSSet *expanded = [self expandedGroupIdentifiers];
+    [self.store removeRule:rule[OGRuleIdentifierKey]];
     [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
     [self refreshAndRepair:NO];
 }
 
 - (void)chooseApplication:(NSButton *)sender {
+    if (self.editingRuleIdentifier) { [self focusRuleEditor]; return; }
     NSInteger row = [self.outlineView rowForView:sender];
     if (row < 0) return;
     NSDictionary *item = [self.outlineView itemAtRow:row];
@@ -679,14 +801,14 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
     if (group) {
         [self.store setApplication:application forGroup:item[OGGroupIdentifierKey]];
     } else {
-        [self.store setApplication:application forExtension:item[OGRuleExtensionKey]
-                                                   inGroup:parent[OGGroupIdentifierKey]];
+        [self.store setApplication:application forRule:item[OGRuleIdentifierKey]];
     }
     [self reloadOutlineWithExpandedGroupIdentifiers:expandedGroups];
     [self refreshAndRepair:YES];
 }
 
 - (void)deleteGroup:(id)sender {
+    if (self.editingRuleIdentifier) { [self focusRuleEditor]; return; }
     NSInteger row = [sender isKindOfClass:[NSMenuItem class]] ? [self contextRow] : self.outlineView.selectedRow;
     NSDictionary *candidate = row >= 0 ? [self.outlineView itemAtRow:row] : nil;
     NSDictionary *group = [self isGroup:candidate] ? candidate : nil;
@@ -699,6 +821,7 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 }
 
 - (void)restoreGroups:(id)sender {
+    if (self.editingRuleIdentifier) { [self focusRuleEditor]; return; }
     NSAlert *alert = [[NSAlert alloc] init];
     alert.alertStyle = NSAlertStyleCritical;
     alert.messageText = [self.language text:@"initialize_groups_warning_title"];
@@ -754,11 +877,11 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
     // Even a status-column reload can terminate AppKit's shared field editor
     // and commit unfinished IME marked text. Keep enforcing rules, but defer
     // table refreshes until the group-name edit has ended.
-    if (self.editingGroupField.currentEditor) return;
+    if (self.editingGroupField.currentEditor || self.editingRuleIdentifier) return;
     NSInteger rowCount = self.outlineView.numberOfRows;
     if (rowCount > 0) {
         [self.outlineView reloadDataForRowIndexes:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, rowCount)]
-                                   columnIndexes:[NSIndexSet indexSetWithIndex:2]];
+                                   columnIndexes:[NSIndexSet indexSetWithIndex:[self.outlineView columnWithIdentifier:@"status"]]];
     }
 }
 
@@ -795,6 +918,12 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 }
 
 - (void)changeLanguage:(NSPopUpButton *)sender {
+    if (self.editingRuleIdentifier) {
+        for (NSMenuItem *item in sender.itemArray)
+            if ([item.representedObject isEqualToString:self.language.code]) [sender selectItem:item];
+        [self focusRuleEditor];
+        return;
+    }
     self.language.code = sender.selectedItem.representedObject;
     [self.window orderOut:nil];
     [[NSStatusBar systemStatusBar] removeStatusItem:self.statusItem];

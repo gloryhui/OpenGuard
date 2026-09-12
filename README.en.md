@@ -33,6 +33,8 @@ OpenGuard keeps the user's choice stable without a privileged helper, a heavy ba
 
 1. Move `OpenGuard.app` to `/Applications`.
 2. Use the top buttons to add groups or rules. Drag rows to reorder them or move rules between groups and the root.
+
+   Rules are created inline in the selected group. Edit the extension and display name, then use the checkmark to confirm or the cross to cancel. Normal rows show pencil and trash icons; the context menu also supports editing and deletion. Cancel keeps the row and discards edits. Blank rules do not participate in protection.
 3. Click `…` on a group to assign one application to every extension, or on an extension to create an override. Right-click a group to rename it.
 4. Optionally enable **Start OpenGuard at login**, and leave automatic restoration enabled.
 

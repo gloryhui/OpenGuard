@@ -3,6 +3,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 extern NSString * const OGRuleExtensionKey;
+extern NSString * const OGRuleIdentifierKey;
 extern NSString * const OGRuleNameKey;
 extern NSString * const OGRuleBundleIdentifierKey;
 extern NSString * const OGRuleApplicationNameKey;
@@ -21,12 +22,17 @@ extern NSString * const OGGroupItemsKey;
 - (NSArray<NSDictionary *> *)effectiveRules;
 - (nullable NSDictionary *)groupWithIdentifier:(NSString *)identifier;
 - (BOOL)containsRuleWithExtension:(NSString *)extension;
+- (nullable NSDictionary *)ruleWithIdentifier:(NSString *)identifier;
+- (NSString *)addDraftRuleToGroup:(nullable NSString *)groupIdentifier;
+- (BOOL)updateRule:(NSString *)identifier extension:(NSString *)extension name:(NSString *)name;
+- (void)removeRule:(NSString *)identifier;
 - (NSString *)addGroupWithTitle:(NSString *)title;
 - (BOOL)addRuleWithExtension:(NSString *)extension
                         name:(NSString *)name
                      toGroup:(nullable NSString *)identifier;
 - (void)renameGroup:(NSString *)identifier title:(NSString *)title;
 - (void)setApplication:(NSDictionary *)application forGroup:(NSString *)identifier;
+- (void)setApplication:(NSDictionary *)application forRule:(NSString *)identifier;
 - (void)setApplication:(NSDictionary *)application
            forExtension:(NSString *)extension
                  inGroup:(nullable NSString *)identifier;

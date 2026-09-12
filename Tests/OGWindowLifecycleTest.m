@@ -8,6 +8,10 @@
 - (void)buildWindow;
 - (void)addGroup:(id)sender;
 - (void)refreshAndRepair:(BOOL)repair;
+- (void)showRuleEditor:(id)sender;
+- (void)cancelAddRule:(id)sender;
+- (void)confirmAddRule:(id)sender;
+- (void)beginEditingRule:(NSString *)identifier;
 @end
 
 int main(void) {
@@ -63,12 +67,46 @@ int main(void) {
         [window makeFirstResponder:outlineView];
         BOOL completedNameSaved = [store.groups.lastObject[OGGroupNameKey] isEqualToString:@"中文拼音分组"];
 
+        NSString *targetGroup = store.groups.lastObject[OGGroupIdentifierKey];
+        NSInteger groupRow = [outlineView rowForItem:[store groupWithIdentifier:targetGroup]];
+        [outlineView selectRowIndexes:[NSIndexSet indexSetWithIndex:groupRow] byExtendingSelection:NO];
+        [delegate showRuleEditor:nil];
+        NSString *draftID = [delegate valueForKey:@"editingRuleIdentifier"];
+        NSDictionary *draft = [store ruleWithIdentifier:draftID];
+        BOOL insertedInGroup = [[store groupWithIdentifier:targetGroup][OGGroupItemsKey] containsObject:draft];
+        [delegate cancelAddRule:nil];
+        BOOL cancelRetainsDraft = [store ruleWithIdentifier:draftID] != nil &&
+            [delegate valueForKey:@"editingRuleIdentifier"] == nil;
+        [delegate beginEditingRule:draftID];
+        [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+        NSTextField *extensionField = [delegate valueForKey:@"ruleExtensionField"];
+        NSTextField *nameField = [delegate valueForKey:@"ruleNameField"];
+        extensionField.stringValue = @"oguitest";
+        [window makeFirstResponder:nameField];
+        NSTextView *ruleEditor = (NSTextView *)nameField.currentEditor;
+        [ruleEditor setMarkedText:@"中文pin" selectedRange:NSMakeRange(5, 0)
+                 replacementRange:NSMakeRange(0, ruleEditor.string.length)];
+        [delegate refreshAndRepair:NO];
+        BOOL ruleIMEPreserved = ruleEditor != nil && nameField.currentEditor == ruleEditor && ruleEditor.hasMarkedText;
+        [ruleEditor insertText:@"中文规则" replacementRange:ruleEditor.markedRange];
+        [delegate confirmAddRule:nil];
+        BOOL confirmedRule = [[store ruleWithIdentifier:draftID][OGRuleExtensionKey] isEqualToString:@"oguitest"] &&
+            [[store ruleWithIdentifier:draftID][OGRuleNameKey] isEqualToString:@"中文规则"];
+        [delegate beginEditingRule:draftID];
+        ((NSTextField *)[delegate valueForKey:@"ruleNameField"]).stringValue = @"discard me";
+        [delegate cancelAddRule:nil];
+        BOOL cancelPreservesName = [[store ruleWithIdentifier:draftID][OGRuleNameKey] isEqualToString:@"中文规则"];
+        BOOL ruleEditingPassed = insertedInGroup && cancelRetainsDraft && ruleIMEPreserved && confirmedRule && cancelPreservesName;
+        printf("inline_rule_insert=%s\ncancel_retains_rule=%s\nrule_ime_preserved=%s\nrule_confirm_and_cancel=%s\n",
+               insertedInGroup ? "yes" : "no", cancelRetainsDraft ? "yes" : "no",
+               ruleIMEPreserved ? "yes" : "no", confirmedRule && cancelPreservesName ? "yes" : "no");
+
         printf("window_retained=%s\nmenu_reopen_cycles=%s\nadd_group_inline_edit=%s\nime_composition_preserved=%s\nime_completed_name_saved=%s\n",
                window != nil && window == [delegate valueForKey:@"window"] ? "yes" : "no",
                passed ? "5/5" : "failed",
                groupEditingStarted ? "yes" : "no", compositionPreserved ? "yes" : "no",
                completedNameSaved ? "yes" : "no");
         [defaults removePersistentDomainForName:suiteName];
-        return passed && groupEditingStarted && compositionPreserved && completedNameSaved ? 0 : 1;
+        return passed && groupEditingStarted && compositionPreserved && completedNameSaved && ruleEditingPassed ? 0 : 1;
     }
 }
