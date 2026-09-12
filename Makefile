@@ -13,9 +13,10 @@ SOURCES := $(wildcard Sources/*.m)
 HEADERS := $(wildcard Sources/*.h)
 APP_SOURCES := $(filter-out Sources/main.m,$(SOURCES))
 WINDOW_TEST := $(BUILD_DIR)/OpenGuardWindowLifecycleTest
+STORE_TEST := $(BUILD_DIR)/OpenGuardRuleStoreTest
 MIN_MACOS := 10.13
 
-.PHONY: all app clean verify test-window-lifecycle package run
+.PHONY: all app clean verify test-window-lifecycle test-rule-store package run
 
 all: app
 
@@ -43,7 +44,17 @@ $(WINDOW_TEST): Tests/OGWindowLifecycleTest.m $(APP_SOURCES) $(HEADERS)
 test-window-lifecycle: $(WINDOW_TEST)
 	@"$(WINDOW_TEST)"
 
-verify: app test-window-lifecycle
+$(STORE_TEST): Tests/OGRuleStoreTest.m Sources/OGRuleStore.m Sources/OGRuleStore.h Sources/OGPresets.m Sources/OGPresets.h
+	@mkdir -p "$(BUILD_DIR)"
+	xcrun clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+		-Wno-deprecated-declarations -Wno-unused-parameter \
+		-I Sources -mmacosx-version-min=$(MIN_MACOS) \
+		-framework Cocoa Sources/OGRuleStore.m Sources/OGPresets.m Tests/OGRuleStoreTest.m -o "$@"
+
+test-rule-store: $(STORE_TEST)
+	@"$(STORE_TEST)"
+
+verify: app test-window-lifecycle test-rule-store
 	@file "$(MACOS_DIR)/$(APP_NAME)"
 	@codesign --verify --deep --strict --verbose=2 "$(APP_DIR)"
 	@plutil -lint "$(CONTENTS_DIR)/Info.plist"

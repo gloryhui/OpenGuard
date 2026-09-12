@@ -2,5 +2,5 @@
 #import "OGUpdateChecker.h"
 
 @interface OGAppDelegate : NSObject <NSApplicationDelegate, NSOutlineViewDataSource, NSOutlineViewDelegate,
-                                     OGUpdateCheckerDelegate>
+                                     NSMenuDelegate, NSTextFieldDelegate, OGUpdateCheckerDelegate>
 @end

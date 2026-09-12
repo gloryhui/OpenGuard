@@ -20,6 +20,7 @@ OpenGuard mantiene la elección del usuario sin un servicio pesado, componentes 
 
 - 33 extensiones predefinidas agrupadas en texto y código fuente, documentos, imágenes, multimedia y archivos comprimidos.
 - Una aplicación para todo un grupo, con excepciones por extensión.
+- Añade grupos y reglas, ordénalos arrastrando, mueve reglas entre grupos y renombra grupos con el menú contextual. Al quitar un grupo, sus reglas pasan a la raíz.
 - Búsqueda por nombre localizado, nombre original, Bundle ID o ruta.
 - Restauración cada tres segundos y comprobación inmediata al reactivar el Mac o la aplicación.
 - AppKit nativo sin dependencias de ejecución de terceros.
@@ -31,9 +32,9 @@ OpenGuard mantiene la elección del usuario sin un servicio pesado, componentes 
 ## Uso
 
 1. Mueve `OpenGuard.app` a `/Applications`.
-2. Usa `…` en un grupo para elegir una aplicación común, o en una extensión para crear una excepción.
-3. Si quieres, activa el inicio de OpenGuard al entrar en macOS.
-4. Mantén activa la restauración automática.
+2. Usa los botones superiores para añadir grupos o reglas. Arrastra filas para ordenar o mover reglas entre grupos y la raíz.
+3. Usa `…` en un grupo para elegir una aplicación común, o en una extensión para crear una excepción. Haz clic derecho para renombrar un grupo.
+4. Si quieres, activa el inicio de sesión y mantén la restauración automática. La inicialización de grupos está dentro del menú “Ajustes” y pide confirmación.
 
 ## Funcionamiento y límite
 

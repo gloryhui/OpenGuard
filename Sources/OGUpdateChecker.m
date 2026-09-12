@@ -8,6 +8,9 @@ static NSString * const OGLatestReleaseAPI = @"https://api.github.com/repos/glor
 @property (nonatomic, weak) id<OGUpdateCheckerDelegate> delegate;
 @property (nonatomic) NSTimer *timer;
 @property (nonatomic, copy, nullable) NSString *notifiedVersion;
+@property (nonatomic, copy, nullable) void (^manualCompletion)(NSString * _Nullable,
+                                                                   NSURL * _Nullable,
+                                                                   NSError * _Nullable);
 @property (nonatomic) BOOL checking;
 @end
 
@@ -44,7 +47,20 @@ static NSString * const OGLatestReleaseAPI = @"https://api.github.com/repos/glor
 }
 
 - (void)checkNow {
+    [self beginCheckWithManualCompletion:nil];
+}
+
+- (void)checkNowWithCompletion:(void (^)(NSString * _Nullable,
+                                         NSURL * _Nullable,
+                                         NSError * _Nullable))completion {
+    [self beginCheckWithManualCompletion:completion];
+}
+
+- (void)beginCheckWithManualCompletion:(void (^ _Nullable)(NSString * _Nullable,
+                                                            NSURL * _Nullable,
+                                                            NSError * _Nullable))completion {
     @synchronized (self) {
+        if (completion) self.manualCompletion = completion;
         if (self.checking) return;
         self.checking = YES;
     }
@@ -63,12 +79,15 @@ static NSString * const OGLatestReleaseAPI = @"https://api.github.com/repos/glor
           completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         __strong typeof(weakSelf) self = weakSelf;
         if (!self) return;
-        @synchronized (self) { self.checking = NO; }
 
         NSHTTPURLResponse *HTTPResponse = [response isKindOfClass:[NSHTTPURLResponse class]]
             ? (NSHTTPURLResponse *)response : nil;
         if (error || HTTPResponse.statusCode != 200 || data.length == 0) {
             if (error) NSLog(@"Update check skipped: %@", error.localizedDescription);
+            NSError *resultError = error ?: [NSError errorWithDomain:@"com.gloryhuis.OpenGuard.Update"
+                                                                 code:HTTPResponse.statusCode ?: -1
+                                                             userInfo:nil];
+            [self finishCheckWithVersion:nil releaseURL:nil error:resultError];
             return;
         }
 
@@ -76,6 +95,9 @@ static NSString * const OGLatestReleaseAPI = @"https://api.github.com/repos/glor
         id object = [NSJSONSerialization JSONObjectWithData:data options:0 error:&JSONError];
         if (![object isKindOfClass:[NSDictionary class]]) {
             NSLog(@"Update check returned invalid metadata: %@", JSONError.localizedDescription ?: @"unknown response");
+            NSError *resultError = JSONError ?: [NSError errorWithDomain:@"com.gloryhuis.OpenGuard.Update"
+                                                                     code:-2 userInfo:nil];
+            [self finishCheckWithVersion:nil releaseURL:nil error:resultError];
             return;
         }
 
@@ -85,16 +107,31 @@ static NSString * const OGLatestReleaseAPI = @"https://api.github.com/repos/glor
         BOOL draft = [release[@"draft"] boolValue];
         BOOL prerelease = [release[@"prerelease"] boolValue];
         NSURL *releaseURL = URLString.length ? [NSURL URLWithString:URLString] : nil;
-        if (!tag.length || !releaseURL || draft || prerelease ||
-            ![OGUpdateChecker isVersion:tag newerThanVersion:self.currentVersion]) return;
-
-        dispatch_async(dispatch_get_main_queue(), ^{
-            if ([self.notifiedVersion isEqualToString:tag]) return;
-            self.notifiedVersion = tag;
-            [self.delegate updateChecker:self didFindNewVersion:tag releaseURL:releaseURL];
-        });
+        NSString *newVersion = tag.length && releaseURL && !draft && !prerelease &&
+            [OGUpdateChecker isVersion:tag newerThanVersion:self.currentVersion] ? tag : nil;
+        [self finishCheckWithVersion:newVersion releaseURL:releaseURL error:nil];
     }];
     [task resume];
+}
+
+- (void)finishCheckWithVersion:(NSString *)version
+                    releaseURL:(NSURL *)releaseURL
+                         error:(NSError *)error {
+    __block void (^manualCompletion)(NSString *, NSURL *, NSError *);
+    @synchronized (self) {
+        self.checking = NO;
+        manualCompletion = self.manualCompletion;
+        self.manualCompletion = nil;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (manualCompletion) {
+            manualCompletion(version, releaseURL, error);
+            return;
+        }
+        if (!version.length || [self.notifiedVersion isEqualToString:version]) return;
+        self.notifiedVersion = version;
+        [self.delegate updateChecker:self didFindNewVersion:version releaseURL:releaseURL];
+    });
 }
 
 + (NSString *)normalizedVersion:(NSString *)version {

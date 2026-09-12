@@ -17,6 +17,9 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)start;
 - (void)stop;
 - (void)checkNow;
+- (void)checkNowWithCompletion:(void (^)(NSString * _Nullable version,
+                                         NSURL * _Nullable releaseURL,
+                                         NSError * _Nullable error))completion;
 
 + (BOOL)isVersion:(NSString *)candidate newerThanVersion:(NSString *)currentVersion;
 

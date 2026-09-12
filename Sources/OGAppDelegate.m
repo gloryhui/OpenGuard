@@ -6,6 +6,7 @@
 #import "OGLanguage.h"
 
 static const NSTimeInterval OGMonitoringInterval = 3.0;
+static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outline-item";
 
 @interface OGAppDelegate ()
 @property OGRuleStore *store;
@@ -16,7 +17,15 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
 @property NSTextField *summaryLabel;
 @property NSButton *monitoringCheckbox;
 @property NSButton *loginCheckbox;
-@property NSButton *deleteGroupButton;
+@property NSButton *removeGroupButton;
+@property NSButton *checkUpdatesButton;
+@property NSMenu *outlineMenu;
+@property NSView *ruleEditor;
+@property NSLayoutConstraint *ruleEditorHeightConstraint;
+@property NSTextField *ruleExtensionField;
+@property NSTextField *ruleNameField;
+@property NSTextField *ruleDestinationLabel;
+@property (copy, nullable) NSString *pendingRuleGroupIdentifier;
 @property NSTimer *timer;
 @property OGUpdateChecker *updateChecker;
 @property (copy) NSDictionary<NSString *, NSString *> *statusByExtension;
@@ -146,12 +155,12 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
 }
 
 - (void)buildWindow {
-    self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 780, 560)
+    self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 940, 620)
                                               styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
                                                          NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable)
                                                 backing:NSBackingStoreBuffered defer:NO];
     self.window.title = @"OpenGuard";
-    self.window.minSize = NSMakeSize(680, 460);
+    self.window.minSize = NSMakeSize(800, 520);
     self.window.releasedWhenClosed = NO;
     [self.window center];
     NSView *content = self.window.contentView;
@@ -181,6 +190,17 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     self.outlineView.usesAlternatingRowBackgroundColors = YES;
     self.outlineView.allowsMultipleSelection = NO;
     self.outlineView.rowHeight = 28;
+    [self.outlineView registerForDraggedTypes:@[OGOutlinePasteboardType]];
+    [self.outlineView setDraggingSourceOperationMask:NSDragOperationMove forLocal:YES];
+    self.outlineMenu = [[NSMenu alloc] initWithTitle:@""];
+    self.outlineMenu.delegate = self;
+    NSMenuItem *renameItem = [self.outlineMenu addItemWithTitle:[self.language text:@"rename_group"]
+                                                         action:@selector(renameGroup:) keyEquivalent:@""];
+    renameItem.target = self;
+    NSMenuItem *removeItem = [self.outlineMenu addItemWithTitle:[self.language text:@"remove_group"]
+                                                         action:@selector(deleteGroup:) keyEquivalent:@""];
+    removeItem.target = self;
+    self.outlineView.menu = self.outlineMenu;
     NSTableColumn *typeColumn = [[NSTableColumn alloc] initWithIdentifier:@"filetype"];
     typeColumn.title = [self.language text:@"file_type"];
     typeColumn.width = 255;
@@ -196,9 +216,62 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     self.outlineView.outlineTableColumn = typeColumn;
     scroll.documentView = self.outlineView;
 
-    NSButton *restoreGroups = [self button:[self.language text:@"restore_groups"] action:@selector(restoreGroups:)];
-    self.deleteGroupButton = [self button:[self.language text:@"delete_group"] action:@selector(deleteGroup:)];
-    self.deleteGroupButton.enabled = NO;
+    NSButton *addGroup = [self button:[self.language text:@"add_group"] action:@selector(addGroup:)];
+    NSButton *addRule = [self button:[self.language text:@"add_rule"] action:@selector(showRuleEditor:)];
+    self.removeGroupButton = [self button:[self.language text:@"remove_group"] action:@selector(deleteGroup:)];
+    self.removeGroupButton.enabled = NO;
+    NSPopUpButton *settings = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:YES];
+    settings.translatesAutoresizingMaskIntoConstraints = NO;
+    [settings addItemWithTitle:[self.language text:@"settings"]];
+    [settings.menu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *initializeItem = [settings.menu addItemWithTitle:[self.language text:@"restore_groups"]
+                                                          action:@selector(restoreGroups:) keyEquivalent:@""];
+    initializeItem.target = self;
+    self.checkUpdatesButton = [self button:[self.language text:@"check_updates"] action:@selector(checkForUpdates:)];
+    NSButton *about = [self button:[self.language text:@"about"] action:@selector(showAbout:)];
+    NSView *toolbar = [[NSView alloc] initWithFrame:NSZeroRect];
+    toolbar.translatesAutoresizingMaskIntoConstraints = NO;
+    for (NSView *view in @[addGroup, addRule, self.removeGroupButton, settings, self.checkUpdatesButton, about]) {
+        [toolbar addSubview:view];
+        [toolbar addConstraint:[NSLayoutConstraint constraintWithItem:view attribute:NSLayoutAttributeCenterY
+                                                            relatedBy:NSLayoutRelationEqual toItem:toolbar
+                                                            attribute:NSLayoutAttributeCenterY multiplier:1 constant:0]];
+    }
+    NSDictionary *toolbarViews = NSDictionaryOfVariableBindings(addGroup, addRule, _removeGroupButton,
+                                                                  settings, _checkUpdatesButton, about);
+    [toolbar addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:
+                             @"H:|[addGroup]-8-[addRule]-8-[_removeGroupButton]-(>=12)-[settings]-8-[_checkUpdatesButton]-8-[about]|"
+                                                                     options:NSLayoutFormatAlignAllCenterY
+                                                                     metrics:nil views:toolbarViews]];
+
+    self.ruleEditor = [[NSView alloc] initWithFrame:NSZeroRect];
+    self.ruleEditor.translatesAutoresizingMaskIntoConstraints = NO;
+    self.ruleEditor.hidden = YES;
+    self.ruleDestinationLabel = [self label:@"" font:[NSFont systemFontOfSize:12]];
+    self.ruleDestinationLabel.textColor = [NSColor secondaryLabelColor];
+    self.ruleExtensionField = [[NSTextField alloc] initWithFrame:NSZeroRect];
+    self.ruleExtensionField.translatesAutoresizingMaskIntoConstraints = NO;
+    self.ruleExtensionField.placeholderString = [self.language text:@"rule_extension_placeholder"];
+    self.ruleNameField = [[NSTextField alloc] initWithFrame:NSZeroRect];
+    self.ruleNameField.translatesAutoresizingMaskIntoConstraints = NO;
+    self.ruleNameField.placeholderString = [self.language text:@"rule_name_placeholder"];
+    self.ruleNameField.target = self;
+    self.ruleNameField.action = @selector(confirmAddRule:);
+    NSButton *cancelRule = [self button:[self.language text:@"cancel"] action:@selector(cancelAddRule:)];
+    NSButton *confirmRule = [self button:[self.language text:@"add"] action:@selector(confirmAddRule:)];
+    for (NSView *view in @[self.ruleDestinationLabel, self.ruleExtensionField, self.ruleNameField,
+                           cancelRule, confirmRule]) [self.ruleEditor addSubview:view];
+    NSDictionary *editorViews = NSDictionaryOfVariableBindings(_ruleDestinationLabel, _ruleExtensionField,
+                                                                 _ruleNameField, cancelRule, confirmRule);
+    [self.ruleEditor addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:
+                                     @"H:|[_ruleDestinationLabel(>=130)]-12-[_ruleExtensionField(100)]-8-[_ruleNameField(180)]-(>=8)-[cancelRule]-8-[confirmRule]|"
+                                                                            options:NSLayoutFormatAlignAllCenterY
+                                                                            metrics:nil views:editorViews]];
+    [self.ruleEditor addConstraint:[NSLayoutConstraint constraintWithItem:self.ruleExtensionField
+                                                                 attribute:NSLayoutAttributeCenterY
+                                                                 relatedBy:NSLayoutRelationEqual toItem:self.ruleEditor
+                                                                 attribute:NSLayoutAttributeCenterY multiplier:1 constant:0]];
+
     NSButton *apply = [self button:[self.language text:@"apply_all"] action:@selector(applyNow:)];
     self.monitoringCheckbox = [NSButton checkboxWithTitle:[self.language text:@"monitor_auto"] target:self
                                                     action:@selector(toggleMonitoring:)];
@@ -209,24 +282,32 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     self.loginCheckbox.translatesAutoresizingMaskIntoConstraints = NO;
     self.loginCheckbox.state = [OGLaunchAgent isEnabled] ? NSControlStateValueOn : NSControlStateValueOff;
 
-    for (NSView *view in @[title, self.summaryLabel, languageLabel, languagePopup, scroll, restoreGroups,
-                           self.deleteGroupButton, apply, self.monitoringCheckbox, self.loginCheckbox]) [content addSubview:view];
-    NSDictionary *views = NSDictionaryOfVariableBindings(title, _summaryLabel, languageLabel, languagePopup, scroll,
-                                                           restoreGroups, _deleteGroupButton, apply,
+    for (NSView *view in @[title, toolbar, self.summaryLabel, self.ruleEditor, languageLabel, languagePopup,
+                           scroll, apply, self.monitoringCheckbox, self.loginCheckbox]) [content addSubview:view];
+    self.ruleEditorHeightConstraint = [NSLayoutConstraint constraintWithItem:self.ruleEditor
+                                                                    attribute:NSLayoutAttributeHeight
+                                                                    relatedBy:NSLayoutRelationEqual toItem:nil
+                                                                    attribute:NSLayoutAttributeNotAnAttribute
+                                                                   multiplier:1 constant:0];
+    [self.ruleEditor addConstraint:self.ruleEditorHeightConstraint];
+    NSDictionary *views = NSDictionaryOfVariableBindings(title, toolbar, _summaryLabel, _ruleEditor,
+                                                           languageLabel, languagePopup, scroll, apply,
                                                            _monitoringCheckbox, _loginCheckbox);
     [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[title]-(>=20)-[languageLabel]-6-[languagePopup]-24-|"
                                                                     options:NSLayoutFormatAlignAllCenterY metrics:nil views:views]];
     [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[_summaryLabel]-24-|"
                                                                     options:0 metrics:nil views:views]];
+    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[toolbar]-24-|"
+                                                                    options:0 metrics:nil views:views]];
+    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[_ruleEditor]-24-|"
+                                                                    options:0 metrics:nil views:views]];
     [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[scroll]-24-|"
                                                                     options:0 metrics:nil views:views]];
-    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[restoreGroups]-8-[_deleteGroupButton]-(>=12)-[apply]-24-|"
+    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[_monitoringCheckbox]-(>=12)-[apply]-24-|"
                                                                     options:NSLayoutFormatAlignAllCenterY metrics:nil views:views]];
-    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[_monitoringCheckbox]-24-|"
-                                                                    options:0 metrics:nil views:views]];
     [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[_loginCheckbox]-24-|"
                                                                     options:0 metrics:nil views:views]];
-    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|-22-[title]-4-[_summaryLabel]-14-[scroll]-12-[restoreGroups]-14-[_monitoringCheckbox]-6-[_loginCheckbox]-18-|"
+    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|-18-[title]-10-[toolbar(30)]-6-[_summaryLabel]-8-[_ruleEditor]-8-[scroll]-12-[_monitoringCheckbox]-6-[_loginCheckbox]-16-|"
                                                                     options:0 metrics:nil views:views]];
     [self.outlineView reloadData];
     [self expandAllGroups];
@@ -253,14 +334,18 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     }
 }
 - (BOOL)isGroup:(NSDictionary *)item { return item[OGGroupItemsKey] != nil; }
+- (NSString *)titleForGroup:(NSDictionary *)group {
+    NSString *customTitle = group[OGGroupNameKey];
+    return customTitle.length ? customTitle : [self.language text:group[OGGroupTitleKey]];
+}
 
 #pragma mark - Outline table
 
 - (NSInteger)outlineView:(NSOutlineView *)outlineView numberOfChildrenOfItem:(id)item {
-    return item ? [item[OGGroupItemsKey] count] : self.store.groups.count;
+    return item ? [item[OGGroupItemsKey] count] : self.store.rootItems.count;
 }
 - (id)outlineView:(NSOutlineView *)outlineView child:(NSInteger)index ofItem:(id)item {
-    return item ? item[OGGroupItemsKey][index] : self.store.groups[index];
+    return item ? item[OGGroupItemsKey][index] : self.store.rootItems[index];
 }
 - (BOOL)outlineView:(NSOutlineView *)outlineView isItemExpandable:(id)item { return [self isGroup:item]; }
 
@@ -270,9 +355,15 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     NSTextField *cell = [NSTextField labelWithString:@""];
     cell.lineBreakMode = NSLineBreakByTruncatingTail;
     if ([column.identifier isEqualToString:@"filetype"]) {
-        cell.stringValue = group ? [self.language text:item[OGGroupTitleKey]]
+        cell.stringValue = group ? [self titleForGroup:item]
                                  : [NSString stringWithFormat:@".%@  —  %@", item[OGRuleExtensionKey], item[OGRuleNameKey]];
-        if (group) cell.font = [NSFont boldSystemFontOfSize:13];
+        if (group) {
+            cell.font = [NSFont boldSystemFontOfSize:13];
+            cell.editable = YES;
+            cell.selectable = YES;
+            cell.delegate = self;
+            cell.identifier = @"groupTitle";
+        }
     } else {
         cell.stringValue = group ? [self groupStatus:item]
                                  : (self.statusByExtension[item[OGRuleExtensionKey]] ?: [self.language text:@"not_configured"]);
@@ -315,6 +406,10 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
 
 - (NSString *)applicationTextForGroup:(NSDictionary *)group {
     NSArray<NSDictionary *> *items = group[OGGroupItemsKey] ?: @[];
+    if (items.count == 0 && [group[OGRuleBundleIdentifierKey] length]) {
+        NSString *name = group[OGRuleApplicationNameKey];
+        return name.length ? name : group[OGRuleBundleIdentifierKey];
+    }
     NSMutableSet<NSString *> *bundleIdentifiers = [NSMutableSet set];
     NSMutableDictionary<NSString *, NSString *> *names = [NSMutableDictionary dictionary];
     NSUInteger configured = 0;
@@ -354,10 +449,192 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
 - (void)outlineViewSelectionDidChange:(NSNotification *)notification {
     NSInteger row = self.outlineView.selectedRow;
     id item = row >= 0 ? [self.outlineView itemAtRow:row] : nil;
-    self.deleteGroupButton.enabled = item && [self isGroup:item];
+    self.removeGroupButton.enabled = item && [self isGroup:item];
+}
+
+- (NSDictionary *)dragPayloadFromInfo:(id<NSDraggingInfo>)info {
+    NSString *JSON = [[info draggingPasteboard] stringForType:OGOutlinePasteboardType];
+    NSData *data = [JSON dataUsingEncoding:NSUTF8StringEncoding];
+    id payload = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+    return [payload isKindOfClass:[NSDictionary class]] ? payload : nil;
+}
+
+- (id<NSPasteboardWriting>)outlineView:(NSOutlineView *)outlineView
+               pasteboardWriterForItem:(NSDictionary *)item {
+    NSMutableDictionary *payload = [NSMutableDictionary dictionary];
+    if ([self isGroup:item]) {
+        payload[@"kind"] = @"group";
+        payload[@"identifier"] = item[OGGroupIdentifierKey];
+    } else {
+        payload[@"kind"] = @"rule";
+        payload[@"extension"] = item[OGRuleExtensionKey];
+        NSDictionary *parent = [outlineView parentForItem:item];
+        if (parent[OGGroupIdentifierKey]) payload[@"parent"] = parent[OGGroupIdentifierKey];
+    }
+    NSData *data = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
+    if (!data) return nil;
+    NSPasteboardItem *pasteboardItem = [[NSPasteboardItem alloc] init];
+    [pasteboardItem setString:[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]
+                      forType:OGOutlinePasteboardType];
+    return pasteboardItem;
+}
+
+- (NSDragOperation)outlineView:(NSOutlineView *)outlineView
+                   validateDrop:(id<NSDraggingInfo>)info
+                   proposedItem:(NSDictionary *)item
+             proposedChildIndex:(NSInteger)index {
+    NSDictionary *payload = [self dragPayloadFromInfo:info];
+    if ([payload[@"kind"] isEqualToString:@"group"]) {
+        return item == nil && index >= 0 ? NSDragOperationMove : NSDragOperationNone;
+    }
+    if (![payload[@"kind"] isEqualToString:@"rule"]) return NSDragOperationNone;
+    if (item && ![self isGroup:item]) return NSDragOperationNone;
+    return NSDragOperationMove;
+}
+
+- (BOOL)outlineView:(NSOutlineView *)outlineView
+          acceptDrop:(id<NSDraggingInfo>)info
+                item:(NSDictionary *)item
+          childIndex:(NSInteger)index {
+    NSDictionary *payload = [self dragPayloadFromInfo:info];
+    NSSet<NSString *> *expanded = [self expandedGroupIdentifiers];
+    BOOL moved = NO;
+    if ([payload[@"kind"] isEqualToString:@"group"]) {
+        NSUInteger destination = index < 0 ? self.store.rootItems.count : (NSUInteger)index;
+        moved = [self.store moveGroup:payload[@"identifier"] toIndex:destination];
+    } else if ([payload[@"kind"] isEqualToString:@"rule"]) {
+        NSString *destinationIdentifier = [self isGroup:item] ? item[OGGroupIdentifierKey] : nil;
+        NSUInteger destination = index < 0
+            ? ([self isGroup:item] ? [item[OGGroupItemsKey] count] : self.store.rootItems.count)
+            : (NSUInteger)index;
+        moved = [self.store moveRuleWithExtension:payload[@"extension"]
+                                        fromGroup:payload[@"parent"]
+                                          toGroup:destinationIdentifier
+                                          atIndex:destination];
+        if (destinationIdentifier) expanded = [expanded setByAddingObject:destinationIdentifier];
+    }
+    if (!moved) return NO;
+    [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
+    [self refreshAndRepair:NO];
+    return YES;
 }
 
 #pragma mark - Group and application actions
+
+- (NSInteger)contextRow {
+    NSInteger clickedRow = self.outlineView.clickedRow;
+    return clickedRow >= 0 ? clickedRow : self.outlineView.selectedRow;
+}
+
+- (NSDictionary *)contextGroup {
+    NSInteger row = [self contextRow];
+    NSDictionary *item = row >= 0 ? [self.outlineView itemAtRow:row] : nil;
+    return [self isGroup:item] ? item : nil;
+}
+
+- (void)menuNeedsUpdate:(NSMenu *)menu {
+    if (menu != self.outlineMenu) return;
+    NSInteger row = [self contextRow];
+    NSDictionary *group = [self contextGroup];
+    if (group && row >= 0) {
+        [self.outlineView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row]
+                     byExtendingSelection:NO];
+    }
+    for (NSMenuItem *item in menu.itemArray) item.enabled = group != nil;
+}
+
+- (void)addGroup:(id)sender {
+    NSString *identifier = [self.store addGroupWithTitle:[self.language text:@"new_group"]];
+    NSSet<NSString *> *expanded = [[self expandedGroupIdentifiers] setByAddingObject:identifier];
+    [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
+    NSDictionary *group = [self.store groupWithIdentifier:identifier];
+    NSInteger row = [self.outlineView rowForItem:group];
+    if (row >= 0) {
+        [self.outlineView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row]
+                     byExtendingSelection:NO];
+        [self.outlineView scrollRowToVisible:row];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [self.window makeFirstResponder:self.outlineView];
+            [self.outlineView editColumn:0 row:row withEvent:nil select:YES];
+        });
+    }
+    [self refreshAndRepair:NO];
+}
+
+- (void)renameGroup:(id)sender {
+    NSInteger row = [self contextRow];
+    if (![self contextGroup] || row < 0) return;
+    [self.outlineView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row]
+                 byExtendingSelection:NO];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.window makeFirstResponder:self.outlineView];
+        [self.outlineView editColumn:0 row:row withEvent:nil select:YES];
+    });
+}
+
+- (void)controlTextDidEndEditing:(NSNotification *)notification {
+    NSTextField *field = notification.object;
+    if (![field.identifier isEqualToString:@"groupTitle"]) return;
+    NSInteger row = [self.outlineView rowForView:field];
+    NSDictionary *group = row >= 0 ? [self.outlineView itemAtRow:row] : nil;
+    NSString *title = [field.stringValue stringByTrimmingCharactersInSet:
+                       [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (group && [self isGroup:group] && title.length) {
+        [self.store renameGroup:group[OGGroupIdentifierKey] title:title];
+    }
+    NSSet<NSString *> *expanded = [self expandedGroupIdentifiers];
+    [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
+}
+
+- (void)showRuleEditor:(id)sender {
+    NSInteger row = self.outlineView.selectedRow;
+    NSDictionary *selectedItem = row >= 0 ? [self.outlineView itemAtRow:row] : nil;
+    NSDictionary *group = [self isGroup:selectedItem] ? selectedItem
+        : (selectedItem ? [self.outlineView parentForItem:selectedItem] : nil);
+    self.pendingRuleGroupIdentifier = group[OGGroupIdentifierKey];
+    NSString *destination = group ? [self titleForGroup:group] : [self.language text:@"ungrouped"];
+    self.ruleDestinationLabel.stringValue = [NSString stringWithFormat:
+                                              [self.language text:@"add_rule_destination"], destination];
+    self.ruleExtensionField.stringValue = @"";
+    self.ruleNameField.stringValue = @"";
+    self.ruleEditor.hidden = NO;
+    self.ruleEditorHeightConstraint.constant = 34;
+    [self.window.contentView layoutSubtreeIfNeeded];
+    [self.window makeFirstResponder:self.ruleExtensionField];
+}
+
+- (void)cancelAddRule:(id)sender {
+    self.ruleEditor.hidden = YES;
+    self.ruleEditorHeightConstraint.constant = 0;
+    self.pendingRuleGroupIdentifier = nil;
+}
+
+- (void)confirmAddRule:(id)sender {
+    NSString *extension = [[self.ruleExtensionField.stringValue
+                            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]
+                           lowercaseString];
+    while ([extension hasPrefix:@"."]) extension = [extension substringFromIndex:1];
+    NSCharacterSet *invalidCharacters = [NSCharacterSet characterSetWithCharactersInString:@"./:\\"];
+    if (!extension.length || extension.length > 32 ||
+        [extension rangeOfCharacterFromSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]].location != NSNotFound ||
+        [extension rangeOfCharacterFromSet:invalidCharacters].location != NSNotFound) {
+        [self showError:[self.language text:@"invalid_extension"]];
+        return;
+    }
+    if ([self.store containsRuleWithExtension:extension]) {
+        [self showError:[NSString stringWithFormat:[self.language text:@"duplicate_rule"], extension]];
+        return;
+    }
+    NSSet<NSString *> *expanded = [self expandedGroupIdentifiers];
+    if (self.pendingRuleGroupIdentifier) {
+        expanded = [expanded setByAddingObject:self.pendingRuleGroupIdentifier];
+    }
+    if (![self.store addRuleWithExtension:extension name:self.ruleNameField.stringValue
+                                  toGroup:self.pendingRuleGroupIdentifier]) return;
+    [self cancelAddRule:nil];
+    [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
+    [self refreshAndRepair:NO];
+}
 
 - (void)chooseApplication:(NSButton *)sender {
     NSInteger row = [self.outlineView rowForView:sender];
@@ -365,7 +642,7 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     NSDictionary *item = [self.outlineView itemAtRow:row];
     BOOL group = [self isGroup:item];
     NSString *title = group ? [NSString stringWithFormat:[self.language text:@"choose_group_app"],
-                               [self.language text:item[OGGroupTitleKey]]]
+                               [self titleForGroup:item]]
                             : [NSString stringWithFormat:[self.language text:@"choose_title"],
                                item[OGRuleExtensionKey]];
     NSDictionary *parent = group ? nil : [self.outlineView parentForItem:item];
@@ -387,21 +664,31 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
 }
 
 - (void)deleteGroup:(id)sender {
-    NSInteger row = self.outlineView.selectedRow;
-    NSDictionary *group = row >= 0 ? [self.outlineView itemAtRow:row] : nil;
+    NSInteger row = [sender isKindOfClass:[NSMenuItem class]] ? [self contextRow] : self.outlineView.selectedRow;
+    NSDictionary *candidate = row >= 0 ? [self.outlineView itemAtRow:row] : nil;
+    NSDictionary *group = [self isGroup:candidate] ? candidate : nil;
     if (!group || ![self isGroup:group]) return;
+    NSSet<NSString *> *expanded = [self expandedGroupIdentifiers];
     [self.store removeGroup:group[OGGroupIdentifierKey]];
-    [self.outlineView reloadData];
-    [self expandAllGroups];
-    self.deleteGroupButton.enabled = NO;
+    [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
+    self.removeGroupButton.enabled = NO;
     [self refreshAndRepair:NO];
 }
 
 - (void)restoreGroups:(id)sender {
-    [self.store restoreDefaultGroups];
-    [self.outlineView reloadData];
-    [self expandAllGroups];
-    [self refreshAndRepair:NO];
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.alertStyle = NSAlertStyleCritical;
+    alert.messageText = [self.language text:@"initialize_groups_warning_title"];
+    alert.informativeText = [self.language text:@"initialize_groups_warning_message"];
+    [alert addButtonWithTitle:[self.language text:@"initialize_groups_confirm"]];
+    [alert addButtonWithTitle:[self.language text:@"cancel"]];
+    [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse response) {
+        if (response != NSAlertFirstButtonReturn) return;
+        [self.store restoreDefaultGroups];
+        [self.outlineView reloadData];
+        [self expandAllGroups];
+        [self refreshAndRepair:NO];
+    }];
 }
 
 #pragma mark - Rule enforcement
@@ -500,9 +787,48 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
 
 #pragma mark - Updates
 
-- (void)updateChecker:(OGUpdateChecker *)checker
- didFindNewVersion:(NSString *)version
-          releaseURL:(NSURL *)releaseURL {
+- (void)showAbout:(id)sender {
+    NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"0";
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.alertStyle = NSAlertStyleInformational;
+    alert.messageText = @"OpenGuard";
+    alert.informativeText = [NSString stringWithFormat:[self.language text:@"about_message"], version];
+    [alert addButtonWithTitle:[self.language text:@"ok"]];
+    [alert beginSheetModalForWindow:self.window completionHandler:nil];
+}
+
+- (void)checkForUpdates:(id)sender {
+    self.checkUpdatesButton.enabled = NO;
+    self.checkUpdatesButton.title = [self.language text:@"checking_updates"];
+    __weak typeof(self) weakSelf = self;
+    [self.updateChecker checkNowWithCompletion:^(NSString *version, NSURL *releaseURL, NSError *error) {
+        __strong typeof(weakSelf) self = weakSelf;
+        if (!self) return;
+        self.checkUpdatesButton.enabled = YES;
+        self.checkUpdatesButton.title = [self.language text:@"check_updates"];
+        if ([error.domain isEqualToString:@"com.gloryhuis.OpenGuard.Update"] && error.code == 404) {
+            NSAlert *alert = [[NSAlert alloc] init];
+            alert.alertStyle = NSAlertStyleInformational;
+            alert.messageText = [self.language text:@"no_release_title"];
+            alert.informativeText = [self.language text:@"no_release_message"];
+            [alert addButtonWithTitle:[self.language text:@"ok"]];
+            [alert beginSheetModalForWindow:self.window completionHandler:nil];
+        } else if (error) {
+            [self showError:[self.language text:@"update_check_failed"]];
+        } else if (version.length && releaseURL) {
+            [self presentUpdateVersion:version releaseURL:releaseURL];
+        } else {
+            NSAlert *alert = [[NSAlert alloc] init];
+            alert.alertStyle = NSAlertStyleInformational;
+            alert.messageText = [self.language text:@"up_to_date_title"];
+            alert.informativeText = [self.language text:@"up_to_date_message"];
+            [alert addButtonWithTitle:[self.language text:@"ok"]];
+            [alert beginSheetModalForWindow:self.window completionHandler:nil];
+        }
+    }];
+}
+
+- (void)presentUpdateVersion:(NSString *)version releaseURL:(NSURL *)releaseURL {
     NSAlert *alert = [[NSAlert alloc] init];
     alert.alertStyle = NSAlertStyleInformational;
     alert.messageText = [self.language text:@"update_available"];
@@ -515,6 +841,12 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
             [[NSWorkspace sharedWorkspace] openURL:releaseURL];
         }
     }];
+}
+
+- (void)updateChecker:(OGUpdateChecker *)checker
+ didFindNewVersion:(NSString *)version
+          releaseURL:(NSURL *)releaseURL {
+    [self presentUpdateVersion:version releaseURL:releaseURL];
 }
 
 @end
