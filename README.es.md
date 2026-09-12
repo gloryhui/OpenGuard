@@ -20,7 +20,7 @@ OpenGuard mantiene la elección del usuario sin un servicio pesado, componentes 
 
 - 33 extensiones predefinidas agrupadas en texto y código fuente, documentos, imágenes, multimedia y archivos comprimidos.
 - Una aplicación para todo un grupo, con excepciones por extensión.
-- Añade grupos y reglas, ordénalos arrastrando, mueve reglas entre grupos y renombra grupos con el menú contextual. Al quitar un grupo, sus reglas pasan a la raíz.
+- Añade grupos y reglas, ordénalos arrastrando y mueve reglas entre grupos. Cada grupo tiene iconos para editar, subir, bajar y eliminar. Puedes eliminar solo el grupo (conservando reglas y aplicaciones en la raíz), eliminar grupo y reglas, o cancelar.
 - Búsqueda por nombre localizado, nombre original, Bundle ID o ruta.
 - Restauración cada tres segundos y comprobación inmediata al reactivar el Mac o la aplicación.
 - AppKit nativo sin dependencias de ejecución de terceros.

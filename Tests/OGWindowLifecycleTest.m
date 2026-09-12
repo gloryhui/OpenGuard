@@ -28,10 +28,15 @@ int main(void) {
         [delegate setValue:[OGLanguage shared] forKey:@"language"];
         [delegate buildStatusItem];
         [delegate buildWindow];
+        NSMenuItem *quitItem = NSApp.mainMenu.itemArray.firstObject.submenu.itemArray.lastObject;
+        BOOL quitShortcutConfigured = [quitItem.keyEquivalent isEqualToString:@"q"] &&
+            quitItem.keyEquivalentModifierMask == NSEventModifierFlagCommand &&
+            quitItem.action == @selector(terminate:) && quitItem.target == NSApp;
+        printf("main_menu_cmd_q=%s\n", quitShortcutConfigured ? "yes" : "no");
 
         __weak NSWindow *window = [delegate valueForKey:@"window"];
         NSStatusItem *statusItem = [delegate valueForKey:@"statusItem"];
-        BOOL passed = YES;
+        BOOL passed = quitShortcutConfigured;
         for (NSUInteger cycle = 0; cycle < 5; cycle++) {
             [window makeKeyAndOrderFront:nil];
             [window close];

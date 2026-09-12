@@ -77,9 +77,17 @@ int main(void) {
         [store removeRule:draftID];
         BOOL removedOnlyTarget = [store ruleWithIdentifier:draftID] == nil && [store containsRuleWithExtension:@"aaa"];
         BOOL editingPassed = draftInactive && edited && rejectsDuplicate && rejectsInvalid && persisted && removedOnlyTarget;
+        NSString *deleteGroup = [store addGroupWithTitle:@"Delete this group"];
+        [store addRuleWithExtension:@"deleteonlythisrule" name:@"Temporary" toGroup:deleteGroup];
+        [store removeGroupAndRules:deleteGroup];
+        BOOL groupAndRulesRemoved = [store groupWithIdentifier:deleteGroup] == nil &&
+            ![store containsRuleWithExtension:@"deleteonlythisrule"] && [store containsRuleWithExtension:@"aaa"];
+        OGRuleStore *afterDeletion = [[OGRuleStore alloc] initWithUserDefaults:defaults];
+        groupAndRulesRemoved = groupAndRulesRemoved && ![afterDeletion containsRuleWithExtension:@"deleteonlythisrule"];
+        printf("delete_group_and_rules=%s\n", groupAndRulesRemoved ? "yes" : "no");
         printf("rule_edit_delete_persistence=%s\n", editingPassed ? "yes" : "no");
 
-        BOOL passed = editingPassed && migrated && added && movedIntoGroup && addedSecondRule && reorderedInGroup && reordered &&
+        BOOL passed = groupAndRulesRemoved && editingPassed && migrated && added && movedIntoGroup && addedSecondRule && reorderedInGroup && reordered &&
             rootMovePreservedRule &&
             rulesMovedToRoot && resetPreservedRules;
         printf("migration=%s\nadd_and_cross_group_move=%s\nin_group_and_root_reorder=%s\n"

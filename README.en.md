@@ -20,7 +20,7 @@ OpenGuard keeps the user's choice stable without a privileged helper, a heavy ba
 
 - 33 programmer-friendly presets grouped into text and source code, documents, images, media, and archives.
 - Set one application for a whole group, then override individual extensions when needed.
-- Add groups and rules, reorder them by dragging, move rules across groups, and rename groups from the context menu. Removing a group moves its rules safely to the root.
+- Add groups and rules, drag to reorder or move rules across groups. Group rows offer edit, up, down and delete icons. Deletion offers group only (preserving rules at the root), group and rules, or cancel.
 - Search applications by localized name, original name, Bundle ID, or path—including system aliases such as the localized name of Preview.
 - Restore changed handlers every three seconds, plus immediate checks after wake and app activation.
 - Native AppKit implementation with no third-party runtime.
@@ -38,7 +38,7 @@ OpenGuard keeps the user's choice stable without a privileged helper, a heavy ba
 3. Click `…` on a group to assign one application to every extension, or on an extension to create an override. Right-click a group to rename it.
 4. Optionally enable **Start OpenGuard at login**, and leave automatic restoration enabled.
 
-The menu bar utility remains active after its window closes. Removing a group preserves its rules at the root. **Initialize Groups** is kept inside the top **Settings** menu and requires confirmation.
+The menu bar utility remains active after its window closes, without a Dock icon. Press ⌘Q in the active app to quit completely. Deleting only a group preserves its rules and application bindings at the root; deleting both removes its rules too. **Initialize Groups** is kept inside the top **Settings** menu and requires confirmation.
 
 ## How it works—and its limit
 

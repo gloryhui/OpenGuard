@@ -37,6 +37,7 @@ extern NSString * const OGGroupItemsKey;
            forExtension:(NSString *)extension
                  inGroup:(nullable NSString *)identifier;
 - (void)removeGroup:(NSString *)identifier;
+- (void)removeGroupAndRules:(NSString *)identifier;
 - (BOOL)moveGroup:(NSString *)identifier toIndex:(NSUInteger)index;
 - (BOOL)moveRuleWithExtension:(NSString *)extension
                     fromGroup:(nullable NSString *)sourceIdentifier

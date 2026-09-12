@@ -83,6 +83,13 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
     for (NSMenuItem *item in menu.itemArray) item.target = self;
     quitItem.target = NSApp;
     self.statusItem.menu = menu;
+
+    // Status-item shortcuts alone are not routed from the app's key window.
+    NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@"OpenGuard"];
+    NSMenuItem *applicationItem = [[NSMenuItem alloc] initWithTitle:@"OpenGuard" action:NULL keyEquivalent:@""];
+    applicationItem.submenu = [menu copy];
+    [mainMenu addItem:applicationItem];
+    NSApp.mainMenu = mainMenu;
 }
 
 - (NSImage *)statusImageWithWarning:(BOOL)warning {
@@ -219,9 +226,9 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
     [self.outlineView addTableColumn:statusColumn];
     NSTableColumn *actionsColumn = [[NSTableColumn alloc] initWithIdentifier:@"actions"];
     actionsColumn.title = [self.language text:@"actions"];
-    actionsColumn.width = 80;
-    actionsColumn.minWidth = 80;
-    actionsColumn.maxWidth = 80;
+    actionsColumn.width = 144;
+    actionsColumn.minWidth = 144;
+    actionsColumn.maxWidth = 144;
     [self.outlineView addTableColumn:actionsColumn];
     self.outlineView.outlineTableColumn = typeColumn;
     scroll.documentView = self.outlineView;
@@ -327,7 +334,7 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 - (NSView *)outlineView:(NSOutlineView *)outlineView viewForTableColumn:(NSTableColumn *)column item:(NSDictionary *)item {
     BOOL group = [self isGroup:item];
     BOOL editing = !group && [item[OGRuleIdentifierKey] isEqualToString:self.editingRuleIdentifier];
-    if ([column.identifier isEqualToString:@"actions"]) return group ? nil : [self actionsCellForRule:item];
+    if ([column.identifier isEqualToString:@"actions"]) return group ? [self actionsCellForGroup:item] : [self actionsCellForRule:item];
     if (editing && [column.identifier isEqualToString:@"filetype"]) return self.ruleExtensionField;
     if (editing && [column.identifier isEqualToString:@"displayName"]) return self.ruleNameField;
     if ([column.identifier isEqualToString:@"displayName"]) {
@@ -633,6 +640,14 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
             [path lineToPoint:NSMakePoint(13, 2)]; [path lineToPoint:NSMakePoint(14, 11)];
             [path moveToPoint:NSMakePoint(7, 10)]; [path lineToPoint:NSMakePoint(7.5, 5)];
             [path moveToPoint:NSMakePoint(11, 10)]; [path lineToPoint:NSMakePoint(10.5, 5)];
+        } else if ([kind isEqualToString:@"up"] || [kind isEqualToString:@"down"]) {
+            BOOL up = [kind isEqualToString:@"up"];
+            CGFloat tip = up ? 14 : 4;
+            CGFloat tail = up ? 4 : 14;
+            CGFloat shoulder = 9;
+            [path moveToPoint:NSMakePoint(9, tail)]; [path lineToPoint:NSMakePoint(9, tip)];
+            [path moveToPoint:NSMakePoint(4, shoulder)]; [path lineToPoint:NSMakePoint(9, tip)];
+            [path lineToPoint:NSMakePoint(14, shoulder)];
         } else if ([kind isEqualToString:@"confirm"]) {
             [path moveToPoint:NSMakePoint(3, 9)]; [path lineToPoint:NSMakePoint(7, 5)];
             [path lineToPoint:NSMakePoint(15, 13)];
@@ -645,6 +660,64 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
     }];
     image.template = YES;
     return image;
+}
+
+- (NSView *)actionsCellForGroup:(NSDictionary *)group {
+    NSView *container = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 144, 28)];
+    NSArray *icons = @[@"edit", @"up", @"down", @"delete"];
+    NSArray *tips = @[@"rename_group", @"move_group_up", @"move_group_down", @"delete_group"];
+    NSArray *groups = self.store.groups;
+    NSUInteger index = [groups indexOfObject:group];
+    for (NSUInteger i = 0; i < 4; i++) {
+        NSButton *button = [NSButton buttonWithImage:[self ruleActionImage:icons[i]] target:self
+                                             action:i == 0 ? @selector(editGroupFromButton:) :
+                                                 (i == 3 ? @selector(deleteGroup:) : @selector(moveGroupFromButton:))];
+        button.frame = NSMakeRect(4 + i * 34, 1, 30, 26);
+        button.bordered = NO;
+        button.imagePosition = NSImageOnly;
+        button.identifier = group[OGGroupIdentifierKey];
+        button.tag = i == 1 ? -1 : 1;
+        button.toolTip = [self.language text:tips[i]];
+        [button setAccessibilityLabel:button.toolTip];
+        button.enabled = !self.editingRuleIdentifier && index != NSNotFound &&
+            (i == 0 || i == 3 || (i == 1 ? index > 0 : index + 1 < groups.count));
+        [container addSubview:button];
+    }
+    return container;
+}
+
+- (void)editGroupFromButton:(NSButton *)sender {
+    if (self.editingRuleIdentifier) return;
+    NSString *identifier = sender.identifier;
+    [self.window makeFirstResponder:self.outlineView];
+    NSDictionary *group = [self.store groupWithIdentifier:identifier];
+    NSInteger row = [self.outlineView rowForItem:group];
+    if (row < 0) return;
+    [self.outlineView selectRowIndexes:[NSIndexSet indexSetWithIndex:row] byExtendingSelection:NO];
+    [self beginEditingGroupAtRow:row];
+}
+
+- (void)moveGroupFromButton:(NSButton *)sender {
+    if (self.editingRuleIdentifier) return;
+    NSString *identifier = sender.identifier;
+    NSInteger direction = sender.tag;
+    [self.window makeFirstResponder:self.outlineView];
+    NSDictionary *group = [self.store groupWithIdentifier:identifier];
+    NSArray *groups = self.store.groups;
+    if (!group) return;
+    NSUInteger index = [groups indexOfObject:group];
+    if (index == NSNotFound || (direction < 0 ? index == 0 : index + 1 >= groups.count)) return;
+    NSDictionary *neighbor = groups[direction < 0 ? index - 1 : index + 1];
+    NSUInteger destination = [self.store.rootItems indexOfObject:neighbor] + (direction > 0 ? 1 : 0);
+    NSSet *expanded = [self expandedGroupIdentifiers];
+    if (![self.store moveGroup:identifier toIndex:destination]) return;
+    [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
+    NSInteger row = [self.outlineView rowForItem:[self.store groupWithIdentifier:identifier]];
+    if (row >= 0) {
+        [self.outlineView selectRowIndexes:[NSIndexSet indexSetWithIndex:row] byExtendingSelection:NO];
+        [self.outlineView scrollRowToVisible:row];
+    }
+    [self refreshAndRepair:NO];
 }
 
 - (NSView *)actionsCellForRule:(NSDictionary *)rule {
@@ -812,12 +885,27 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
     NSInteger row = [sender isKindOfClass:[NSMenuItem class]] ? [self contextRow] : self.outlineView.selectedRow;
     NSDictionary *candidate = row >= 0 ? [self.outlineView itemAtRow:row] : nil;
     NSDictionary *group = [self isGroup:candidate] ? candidate : nil;
+    if ([sender isKindOfClass:NSButton.class] && [sender identifier])
+        group = [self.store groupWithIdentifier:[sender identifier]];
     if (!group || ![self isGroup:group]) return;
-    NSSet<NSString *> *expanded = [self expandedGroupIdentifiers];
-    [self.store removeGroup:group[OGGroupIdentifierKey]];
-    [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
-    self.removeGroupButton.enabled = NO;
-    [self refreshAndRepair:NO];
+    NSString *identifier = group[OGGroupIdentifierKey];
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.alertStyle = NSAlertStyleWarning;
+    alert.messageText = [NSString stringWithFormat:[self.language text:@"delete_group_prompt"], [self titleForGroup:group]];
+    alert.informativeText = [self.language text:@"delete_group_choices_message"];
+    [alert addButtonWithTitle:[self.language text:@"delete_group_only"]];
+    [alert addButtonWithTitle:[self.language text:@"delete_group_and_rules"]];
+    NSButton *cancel = [alert addButtonWithTitle:[self.language text:@"cancel"]];
+    cancel.keyEquivalent = @"\033";
+    [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse response) {
+        if (response != NSAlertFirstButtonReturn && response != NSAlertSecondButtonReturn) return;
+        NSSet *expanded = [self expandedGroupIdentifiers];
+        if (response == NSAlertFirstButtonReturn) [self.store removeGroup:identifier];
+        else [self.store removeGroupAndRules:identifier];
+        [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
+        self.removeGroupButton.enabled = NO;
+        [self refreshAndRepair:NO];
+    }];
 }
 
 - (void)restoreGroups:(id)sender {

@@ -401,6 +401,14 @@ static NSString * const OGMonitoringDefaultsKey = @"monitoringEnabled";
     [self save];
 }
 
+- (void)removeGroupAndRules:(NSString *)identifier {
+    self.rootItems = [self.rootItems filteredArrayUsingPredicate:
+        [NSPredicate predicateWithBlock:^BOOL(NSDictionary *item, NSDictionary *bindings) {
+            return ![self isGroup:item] || ![item[OGGroupIdentifierKey] isEqualToString:identifier];
+        }]];
+    [self save];
+}
+
 - (BOOL)moveGroup:(NSString *)identifier toIndex:(NSUInteger)index {
     NSMutableArray *rootItems = [self.rootItems mutableCopy];
     NSUInteger sourceIndex = [rootItems indexOfObjectPassingTest:
