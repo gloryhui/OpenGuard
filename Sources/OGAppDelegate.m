@@ -67,8 +67,11 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     [menu addItemWithTitle:[self.language text:@"menu_open"] action:@selector(showWindow:) keyEquivalent:@""];
     [menu addItemWithTitle:[self.language text:@"menu_apply"] action:@selector(applyNow:) keyEquivalent:@""];
     [menu addItem:[NSMenuItem separatorItem]];
-    [menu addItemWithTitle:[self.language text:@"menu_quit"] action:@selector(terminate:) keyEquivalent:@"q"];
+    NSMenuItem *quitItem = [menu addItemWithTitle:[self.language text:@"menu_quit"]
+                                            action:@selector(terminate:)
+                                     keyEquivalent:@"q"];
     for (NSMenuItem *item in menu.itemArray) item.target = self;
+    quitItem.target = NSApp;
     self.statusItem.menu = menu;
 }
 
