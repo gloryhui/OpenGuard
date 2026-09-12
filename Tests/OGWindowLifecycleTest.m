@@ -7,6 +7,7 @@
 - (void)buildStatusItem;
 - (void)buildWindow;
 - (void)addGroup:(id)sender;
+- (void)refreshAndRepair:(BOOL)repair;
 @end
 
 int main(void) {
@@ -51,11 +52,23 @@ int main(void) {
         BOOL groupEditingStarted = store.groups.count == groupCount + 1 &&
             groupTitleField.currentEditor != nil;
 
-        printf("window_retained=%s\nmenu_reopen_cycles=%s\nadd_group_inline_edit=%s\n",
+        NSTextView *editor = (NSTextView *)groupTitleField.currentEditor;
+        NSString *originalTitle = store.groups.lastObject[OGGroupNameKey];
+        [editor setMarkedText:@"中文pin" selectedRange:NSMakeRange(5, 0)
+             replacementRange:NSMakeRange(0, editor.string.length)];
+        [delegate refreshAndRepair:NO];
+        BOOL compositionPreserved = groupTitleField.currentEditor == editor && editor.hasMarkedText &&
+            [store.groups.lastObject[OGGroupNameKey] isEqualToString:originalTitle];
+        [editor insertText:@"中文拼音分组" replacementRange:editor.markedRange];
+        [window makeFirstResponder:outlineView];
+        BOOL completedNameSaved = [store.groups.lastObject[OGGroupNameKey] isEqualToString:@"中文拼音分组"];
+
+        printf("window_retained=%s\nmenu_reopen_cycles=%s\nadd_group_inline_edit=%s\nime_composition_preserved=%s\nime_completed_name_saved=%s\n",
                window != nil && window == [delegate valueForKey:@"window"] ? "yes" : "no",
                passed ? "5/5" : "failed",
-               groupEditingStarted ? "yes" : "no");
+               groupEditingStarted ? "yes" : "no", compositionPreserved ? "yes" : "no",
+               completedNameSaved ? "yes" : "no");
         [defaults removePersistentDomainForName:suiteName];
-        return passed && groupEditingStarted ? 0 : 1;
+        return passed && groupEditingStarted && compositionPreserved && completedNameSaved ? 0 : 1;
     }
 }

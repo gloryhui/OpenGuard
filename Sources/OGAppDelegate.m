@@ -25,6 +25,7 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 @property NSTextField *ruleExtensionField;
 @property NSTextField *ruleNameField;
 @property NSTextField *ruleDestinationLabel;
+@property (nonatomic, weak) NSTextField *editingGroupField;
 @property (copy, nullable) NSString *pendingRuleGroupIdentifier;
 @property NSTimer *timer;
 @property OGUpdateChecker *updateChecker;
@@ -539,6 +540,7 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
     NSTextField *field = [self.outlineView viewAtColumn:0 row:row makeIfNecessary:YES];
     field.editable = YES;
     field.selectable = YES;
+    self.editingGroupField = field;
     [self.window makeFirstResponder:self.outlineView];
     [self.outlineView editColumn:0 row:row withEvent:nil select:YES];
 }
@@ -595,6 +597,7 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 - (void)controlTextDidEndEditing:(NSNotification *)notification {
     NSTextField *field = notification.object;
     if (![field.identifier isEqualToString:@"groupTitle"]) return;
+    self.editingGroupField = nil;
     NSInteger row = [self.outlineView rowForView:field];
     NSDictionary *group = row >= 0 ? [self.outlineView itemAtRow:row] : nil;
     NSString *title = [field.stringValue stringByTrimmingCharactersInSet:
@@ -748,6 +751,10 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
                                      (unsigned long)self.store.groups.count, (unsigned long)protectedCount,
                                      (unsigned long)rules.count, (unsigned long)self.repairCount];
     [self updateStatusItemWithWarning:protectedCount != rules.count];
+    // Even a status-column reload can terminate AppKit's shared field editor
+    // and commit unfinished IME marked text. Keep enforcing rules, but defer
+    // table refreshes until the group-name edit has ended.
+    if (self.editingGroupField.currentEditor) return;
     NSInteger rowCount = self.outlineView.numberOfRows;
     if (rowCount > 0) {
         [self.outlineView reloadDataForRowIndexes:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, rowCount)]
