@@ -14,7 +14,7 @@ default group structure changes.
 - 33 built-in extension presets organized into five removable groups
 - Programmer-friendly text and source-code group for assigning Markdown, plain text, configuration, web, and source files to one editor
 - Assign one application to a whole group or override individual extensions
-- Built-in application picker with instant search by name, Bundle ID, or installation path
+- Built-in application picker with instant search by localized name, original name, Bundle ID, or installation path
 - Restore the original group structure at any time without losing mappings in groups that still exist
 - Automatic restoration every three seconds, plus immediate checks after wake and app activation
 - Optional login launch and abnormal-exit recovery without administrator privileges

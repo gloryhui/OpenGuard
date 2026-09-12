@@ -2,6 +2,8 @@
 #import "OGLanguage.h"
 #import "OGRuleStore.h"
 
+static NSString * const OGApplicationAliasesKey = @"searchAliases";
+
 @interface OGApplicationPicker ()
 @property OGLanguage *language;
 @property NSPanel *panel;
@@ -153,10 +155,16 @@
             NSString *name = [bundle objectForInfoDictionaryKey:@"CFBundleDisplayName"]
                 ?: [bundle objectForInfoDictionaryKey:@"CFBundleName"]
                 ?: [url.lastPathComponent stringByDeletingPathExtension];
+            NSDictionary<NSString *, NSString *> *localizedNames = [self localizedNamesForBundle:bundle];
+            NSString *displayName = localizedNames[self.language.code] ?: name;
+            NSMutableOrderedSet<NSString *> *aliases = [NSMutableOrderedSet orderedSetWithObject:name];
+            [aliases addObject:[url.lastPathComponent stringByDeletingPathExtension]];
+            [aliases addObjectsFromArray:localizedNames.allValues];
             [seenPaths addObject:path];
             [applications addObject:@{OGRuleBundleIdentifierKey: bundleIdentifier,
-                                      OGRuleApplicationNameKey: name,
-                                      OGRuleApplicationPathKey: path}];
+                                      OGRuleApplicationNameKey: displayName,
+                                      OGRuleApplicationPathKey: path,
+                                      OGApplicationAliasesKey: aliases.array}];
         }
     }
     return [applications sortedArrayUsingComparator:^NSComparisonResult(NSDictionary *left, NSDictionary *right) {
@@ -165,6 +173,41 @@
         if (nameResult != NSOrderedSame) return nameResult;
         return [left[OGRuleApplicationPathKey] localizedStandardCompare:right[OGRuleApplicationPathKey]];
     }];
+}
+
+- (NSDictionary<NSString *, NSString *> *)localizedNamesForBundle:(NSBundle *)bundle {
+    NSDictionary<NSString *, NSArray<NSString *> *> *localizations = @{
+        @"en": @[@"en"],
+        @"zh-Hans": @[@"zh_CN", @"zh-Hans", @"zh_Hans", @"zh"],
+        @"ja": @[@"ja"],
+        @"ko": @[@"ko"],
+        @"es": @[@"es", @"es_419"]
+    };
+    NSString *resourcesPath = bundle.resourcePath;
+    NSDictionary *localizationTable = [NSDictionary dictionaryWithContentsOfFile:
+                                        [resourcesPath stringByAppendingPathComponent:@"InfoPlist.loctable"]];
+    NSMutableDictionary<NSString *, NSString *> *names = [NSMutableDictionary dictionary];
+    for (NSString *languageCode in localizations) {
+        for (NSString *localization in localizations[languageCode]) {
+            NSDictionary *values = [localizationTable[localization] isKindOfClass:[NSDictionary class]]
+                ? localizationTable[localization] : nil;
+            if (!values) {
+                NSString *path = [resourcesPath stringByAppendingPathComponent:
+                                  [NSString stringWithFormat:@"%@.lproj/InfoPlist.strings", localization]];
+                values = [NSDictionary dictionaryWithContentsOfFile:path];
+            }
+            NSString *name = [values[@"CFBundleDisplayName"] isKindOfClass:[NSString class]]
+                ? values[@"CFBundleDisplayName"] : nil;
+            if (!name && [values[@"CFBundleName"] isKindOfClass:[NSString class]]) {
+                name = values[@"CFBundleName"];
+            }
+            if (name.length) {
+                names[languageCode] = name;
+                break;
+            }
+        }
+    }
+    return names;
 }
 
 - (void)filterApplications:(id)sender {
@@ -180,6 +223,9 @@
             for (NSString *key in @[OGRuleApplicationNameKey, OGRuleBundleIdentifierKey,
                                     OGRuleApplicationPathKey]) {
                 if ([application[key] rangeOfString:query options:options].location != NSNotFound) return YES;
+            }
+            for (NSString *alias in application[OGApplicationAliasesKey]) {
+                if ([alias rangeOfString:query options:options].location != NSNotFound) return YES;
             }
             return NO;
         }]];
