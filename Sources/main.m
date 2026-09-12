@@ -3,17 +3,21 @@
 #import "OGLaunchServices.h"
 #import "OGLanguage.h"
 #import "OGPresets.h"
+#import "OGUpdateChecker.h"
 
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         NSArray<NSString *> *arguments = [[NSProcessInfo processInfo] arguments];
         if ([arguments containsObject:@"--verify-content"]) {
-            printf("languages=%lu\ngroups=%lu\npresets=%lu\ntranslations_complete=%s\n",
+            BOOL versionComparisonWorks = [OGUpdateChecker isVersion:@"v1.10.0" newerThanVersion:@"1.9.9"] &&
+                                          ![OGUpdateChecker isVersion:@"1.1.0" newerThanVersion:@"v1.1.0"];
+            printf("languages=%lu\ngroups=%lu\npresets=%lu\ntranslations_complete=%s\nversion_compare=%s\n",
                    (unsigned long)[OGLanguage supportedLanguages].count,
                    (unsigned long)[OGPresets defaultGroups].count,
                    (unsigned long)[OGPresets all].count,
-                   [[OGLanguage shared] hasCompleteTranslations] ? "yes" : "no");
-            return [[OGLanguage shared] hasCompleteTranslations] ? 0 : 3;
+                   [[OGLanguage shared] hasCompleteTranslations] ? "yes" : "no",
+                   versionComparisonWorks ? "yes" : "no");
+            return [[OGLanguage shared] hasCompleteTranslations] && versionComparisonWorks ? 0 : 3;
         }
         NSUInteger index = [arguments indexOfObject:@"--diagnose"];
         if (index != NSNotFound && index + 1 < arguments.count) {

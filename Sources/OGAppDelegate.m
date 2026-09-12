@@ -18,6 +18,7 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
 @property NSButton *loginCheckbox;
 @property NSButton *deleteGroupButton;
 @property NSTimer *timer;
+@property OGUpdateChecker *updateChecker;
 @property (copy) NSDictionary<NSString *, NSString *> *statusByExtension;
 @property NSUInteger repairCount;
 @property BOOL agentLaunch;
@@ -42,11 +43,15 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     [self buildWindow];
     [self refreshAndRepair:self.store.monitoringEnabled];
     [self restartTimer];
+    NSString *version = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"0";
+    self.updateChecker = [[OGUpdateChecker alloc] initWithCurrentVersion:version delegate:self];
+    [self.updateChecker start];
     if (!self.agentLaunch) [self showWindow:nil];
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
     [self.timer invalidate];
+    [self.updateChecker stop];
     [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self];
 }
 - (void)applicationDidBecomeActive:(NSNotification *)notification {
@@ -402,6 +407,25 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     alert.messageText = @"OpenGuard";
     alert.informativeText = text;
     [alert runModal];
+}
+
+#pragma mark - Updates
+
+- (void)updateChecker:(OGUpdateChecker *)checker
+ didFindNewVersion:(NSString *)version
+          releaseURL:(NSURL *)releaseURL {
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.alertStyle = NSAlertStyleInformational;
+    alert.messageText = [self.language text:@"update_available"];
+    alert.informativeText = [NSString stringWithFormat:[self.language text:@"update_message"], version];
+    [alert addButtonWithTitle:[self.language text:@"update_view_release"]];
+    [alert addButtonWithTitle:[self.language text:@"update_later"]];
+    [NSApp activateIgnoringOtherApps:YES];
+    [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse returnCode) {
+        if (returnCode == NSAlertFirstButtonReturn) {
+            [[NSWorkspace sharedWorkspace] openURL:releaseURL];
+        }
+    }];
 }
 
 @end

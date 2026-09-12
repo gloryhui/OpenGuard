@@ -1,0 +1,66 @@
+<p align="center">
+  <img src="docs/open-guard-hero.png" alt="ファイルの既定アプリを保護する OpenGuard" width="100%">
+</p>
+
+<p align="center">
+  <a href="README.md">简体中文</a> · <a href="README.en.md">English</a> · <strong>日本語</strong> · <a href="README.ko.md">한국어</a> · <a href="README.es.md">Español</a>
+</p>
+
+# OpenGuard
+
+OpenGuard は、拡張子とアプリの関連付けを安定して維持する、軽量なネイティブ macOS メニューバーユーティリティです。別のアプリが既定のハンドラを変更すると、設定したルールを自動的に復元します。
+
+## 開発した理由
+
+きっかけは、`.md` を Visual Studio Code に設定しても、しばらくすると Xcode などに奪い返されるという具体的な不便でした。Finder の「常にこのアプリケーションで開く」は一度は直せても、次の変更を防げません。
+
+OpenGuard は、管理者権限や重い常駐サービスを使わず、ユーザーの選択を維持します。
+
+## 特長
+
+- テキストとソースコード、文書、画像、メディア、アーカイブに整理された 33 種類のプリセット。
+- グループ全体に同じアプリを指定し、必要な拡張子だけ個別に上書き。
+- ローカライズ名、元の名前、Bundle ID、パスでアプリを検索。
+- 3 秒ごとの自動復元と、スリープ解除・アプリ再アクティブ時の即時確認。
+- サードパーティ製ランタイムを使わないネイティブ AppKit 実装。
+- 简体中文、English、日本語、한국어、Español の 5 言語。
+- macOS 10.13 以降、Intel と Apple Silicon に対応。
+- 管理者権限不要。ログイン起動はユーザーレベルの LaunchAgent を使用。
+- 起動時と 1 時間ごとに GitHub Releases を非同期確認。
+
+## 使い方
+
+1. `OpenGuard.app` を `/Applications` に移動します。
+2. グループの `…` で共通アプリを、各拡張子の `…` で個別ルールを選びます。
+3. 必要なら「ログイン時に OpenGuard を起動」を有効にします。
+4. 自動復元をオンのままにします。
+
+## 仕組みと制限
+
+macOS Launch Services と UTI を通してファイルハンドラを読み書きします。カーネルレベルで変更を阻止するのではなく、変更を検出して素早く復元するため、軽量で特権コンポーネントも不要です。
+
+## 更新確認
+
+起動時に 1 回、その後は 1 時間ごとに GitHub の最新 Release を非同期確認します。同じバージョンは 1 回の実行中に一度だけ通知され、ネットワーク障害や Release がない場合は静かにスキップします。自動ダウンロードや自動インストールは行いません。
+
+## ビルド
+
+macOS 10.13 以降と Xcode Command Line Tools が必要です。
+
+```sh
+make clean verify
+```
+
+Universal App は `build/OpenGuard.app` に生成されます。
+
+## プライバシー
+
+テレメトリ、広告、追跡はありません。ルール、ファイル名、ファイル一覧、アプリ一覧をアップロードしません。唯一の通信は GitHub API から公開 Release メタデータを取得するリクエストです。
+
+## アートワーク
+
+アイコンと README のメイン画像は、OpenGuard 専用のオリジナルなテキストプロンプトから作成しました。参照画像、素材集、第三者の商標、既存アプリのロゴは使用していません。詳細は [ARTWORK.md](ARTWORK.md) を参照してください。
+
+## ライセンス
+
+[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0) に基づく source-available ソフトウェアです。非商用目的の閲覧、変更、Fork、再配布は可能ですが、商用利用はできません。

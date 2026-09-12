@@ -14,9 +14,10 @@ all: app
 
 app: $(MACOS_DIR)/$(APP_NAME)
 
-$(MACOS_DIR)/$(APP_NAME): $(SOURCES) $(HEADERS) Resources/Info.plist
+$(MACOS_DIR)/$(APP_NAME): $(SOURCES) $(HEADERS) Resources/Info.plist Resources/OpenGuard.icns
 	@mkdir -p "$(MACOS_DIR)" "$(RESOURCES_DIR)"
 	@cp Resources/Info.plist "$(CONTENTS_DIR)/Info.plist"
+	@cp Resources/OpenGuard.icns "$(RESOURCES_DIR)/OpenGuard.icns"
 	xcrun clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
 		-Wno-deprecated-declarations -Wno-unused-parameter \
 		-arch arm64 -arch x86_64 -mmacosx-version-min=$(MIN_MACOS) \
