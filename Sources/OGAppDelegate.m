@@ -244,13 +244,38 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
 }
 
 - (NSString *)applicationTextForItem:(NSDictionary *)item group:(BOOL)isGroup {
+    if (isGroup) return [self applicationTextForGroup:item];
     if (item[OGRuleApplicationNameKey]) return item[OGRuleApplicationNameKey];
-    if (!isGroup) {
-        NSDictionary *parent = [self.outlineView parentForItem:item];
-        if (parent[OGRuleApplicationNameKey])
-            return [NSString stringWithFormat:[self.language text:@"inherited_app"], parent[OGRuleApplicationNameKey]];
-    }
+    NSDictionary *parent = [self.outlineView parentForItem:item];
+    if (parent[OGRuleApplicationNameKey])
+        return [NSString stringWithFormat:[self.language text:@"inherited_app"], parent[OGRuleApplicationNameKey]];
     return [self.language text:@"not_set"];
+}
+
+- (NSString *)applicationTextForGroup:(NSDictionary *)group {
+    NSArray<NSDictionary *> *items = group[OGGroupItemsKey] ?: @[];
+    NSMutableSet<NSString *> *bundleIdentifiers = [NSMutableSet set];
+    NSMutableDictionary<NSString *, NSString *> *names = [NSMutableDictionary dictionary];
+    NSUInteger configured = 0;
+    for (NSDictionary *item in items) {
+        NSString *bundleIdentifier = item[OGRuleBundleIdentifierKey] ?: group[OGRuleBundleIdentifierKey];
+        if (!bundleIdentifier.length) continue;
+        configured++;
+        [bundleIdentifiers addObject:bundleIdentifier];
+        NSString *name = item[OGRuleApplicationNameKey] ?: group[OGRuleApplicationNameKey];
+        if (!name.length) name = [OGLaunchServices applicationNameForBundleIdentifier:bundleIdentifier];
+        if (name.length && !names[bundleIdentifier]) names[bundleIdentifier] = name;
+    }
+    if (configured == 0) return [self.language text:@"not_set"];
+    if (configured == items.count && bundleIdentifiers.count == 1) {
+        NSString *bundleIdentifier = bundleIdentifiers.anyObject;
+        return names[bundleIdentifier] ?: bundleIdentifier;
+    }
+    if (configured < items.count) {
+        return [NSString stringWithFormat:[self.language text:@"partial_apps"],
+                (unsigned long)configured, (unsigned long)items.count];
+    }
+    return [self.language text:@"multiple_apps"];
 }
 
 - (NSString *)groupStatus:(NSDictionary *)group {
