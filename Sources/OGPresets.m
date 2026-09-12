@@ -10,21 +10,19 @@
 
 + (NSArray<NSDictionary *> *)defaultGroups {
     return @[
-        @{@"identifier": @"documents", @"titleKey": @"group_documents", @"items": @[
+        @{@"identifier": @"developer-text", @"titleKey": @"group_developer_text", @"items": @[
               @{@"extension": @"md", @"name": @"Markdown"}, @{@"extension": @"txt", @"name": @"Plain Text"},
-              @{@"extension": @"log", @"name": @"Log"}, @{@"extension": @"pdf", @"name": @"PDF"},
-              @{@"extension": @"csv", @"name": @"CSV"}]},
-        @{@"identifier": @"data", @"titleKey": @"group_data", @"items": @[
+              @{@"extension": @"log", @"name": @"Log"}, @{@"extension": @"csv", @"name": @"CSV"},
               @{@"extension": @"json", @"name": @"JSON"}, @{@"extension": @"yaml", @"name": @"YAML"},
-              @{@"extension": @"yml", @"name": @"YAML"}, @{@"extension": @"xml", @"name": @"XML"}]},
-        @{@"identifier": @"web", @"titleKey": @"group_web", @"items": @[
+              @{@"extension": @"yml", @"name": @"YAML"}, @{@"extension": @"xml", @"name": @"XML"},
               @{@"extension": @"html", @"name": @"HTML"}, @{@"extension": @"css", @"name": @"CSS"},
-              @{@"extension": @"js", @"name": @"JavaScript"}, @{@"extension": @"ts", @"name": @"TypeScript"}]},
-        @{@"identifier": @"source", @"titleKey": @"group_source", @"items": @[
+              @{@"extension": @"js", @"name": @"JavaScript"}, @{@"extension": @"ts", @"name": @"TypeScript"},
               @{@"extension": @"py", @"name": @"Python"}, @{@"extension": @"java", @"name": @"Java"},
               @{@"extension": @"c", @"name": @"C Source"}, @{@"extension": @"cpp", @"name": @"C++ Source"},
               @{@"extension": @"h", @"name": @"Header"}, @{@"extension": @"swift", @"name": @"Swift"},
               @{@"extension": @"go", @"name": @"Go"}, @{@"extension": @"rs", @"name": @"Rust"}]},
+        @{@"identifier": @"documents", @"titleKey": @"group_documents", @"items": @[
+              @{@"extension": @"pdf", @"name": @"PDF"}]},
         @{@"identifier": @"images", @"titleKey": @"group_images", @"items": @[
               @{@"extension": @"png", @"name": @"PNG Image"}, @{@"extension": @"jpg", @"name": @"JPEG Image"},
               @{@"extension": @"jpeg", @"name": @"JPEG Image"}, @{@"extension": @"gif", @"name": @"GIF Image"},

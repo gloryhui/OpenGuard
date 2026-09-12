@@ -11,7 +11,8 @@ NSString * const OGGroupIdentifierKey = @"identifier";
 NSString * const OGGroupTitleKey = @"titleKey";
 NSString * const OGGroupItemsKey = @"items";
 
-static NSString * const OGGroupsDefaultsKey = @"groups.v2";
+static NSString * const OGGroupsDefaultsKey = @"groups.v3";
+static NSString * const OGLegacyGroupsDefaultsKey = @"groups.v2";
 static NSString * const OGLegacyRulesDefaultsKey = @"rules.v1";
 static NSString * const OGMonitoringDefaultsKey = @"monitoringEnabled";
 
@@ -25,13 +26,33 @@ static NSString * const OGMonitoringDefaultsKey = @"monitoringEnabled";
     if (saved) {
         _groups = saved;
     } else {
-        NSArray *legacy = [defaults arrayForKey:OGLegacyRulesDefaultsKey] ?: [self initialVSCodeRule];
+        NSArray *oldGroups = [defaults arrayForKey:OGLegacyGroupsDefaultsKey];
+        NSArray *legacy = oldGroups ? [self rulesFromGroups:oldGroups]
+                                    : ([defaults arrayForKey:OGLegacyRulesDefaultsKey] ?: [self initialVSCodeRule]);
         _groups = [self groupsByApplyingLegacyRules:legacy toGroups:[OGPresets defaultGroups]];
     }
     _monitoringEnabled = [defaults objectForKey:OGMonitoringDefaultsKey]
         ? [defaults boolForKey:OGMonitoringDefaultsKey] : YES;
     [self save];
     return self;
+}
+
+- (NSArray<NSDictionary *> *)rulesFromGroups:(NSArray<NSDictionary *> *)groups {
+    NSMutableArray *rules = [NSMutableArray array];
+    for (NSDictionary *group in groups) {
+        for (NSDictionary *item in group[OGGroupItemsKey] ?: @[]) {
+            NSString *bundleID = item[OGRuleBundleIdentifierKey] ?: group[OGRuleBundleIdentifierKey];
+            if (!bundleID) continue;
+            NSMutableDictionary *rule = [item mutableCopy];
+            if (!item[OGRuleBundleIdentifierKey]) {
+                rule[OGRuleBundleIdentifierKey] = bundleID;
+                rule[OGRuleApplicationNameKey] = group[OGRuleApplicationNameKey];
+                rule[OGRuleApplicationPathKey] = group[OGRuleApplicationPathKey];
+            }
+            [rules addObject:rule];
+        }
+    }
+    return rules;
 }
 
 - (NSArray<NSDictionary *> *)initialVSCodeRule {

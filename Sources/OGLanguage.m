@@ -67,8 +67,8 @@ static NSString * const OGLanguageDefaultsKey = @"languageCode";
             @"group_status": @"%lu protected · %lu/%lu configured",
             @"choose_group_app": @"Choose one application for %@",
             @"group_summary": @"%lu groups · %lu/%lu rules protected · %lu restorations",
-            @"group_documents": @"Documents & Text", @"group_data": @"Data & Configuration",
-            @"group_web": @"Web Development", @"group_source": @"Source Code",
+            @"group_developer_text": @"Text & Source Code",
+            @"group_documents": @"Documents & Reading",
             @"group_images": @"Images", @"group_media": @"Audio & Video",
             @"group_archives": @"Archives", @"group_custom": @"Custom"
         },
@@ -90,8 +90,8 @@ static NSString * const OGLanguageDefaultsKey = @"languageCode";
             @"group_status": @"已保护 %lu · 已配置 %lu/%lu",
             @"choose_group_app": @"为“%@”统一选择应用",
             @"group_summary": @"%lu 个分组 · 已保护 %lu/%lu 条规则 · 已恢复 %lu 次",
-            @"group_documents": @"文档与文本", @"group_data": @"数据与配置",
-            @"group_web": @"Web 开发", @"group_source": @"源代码",
+            @"group_developer_text": @"文本与源代码",
+            @"group_documents": @"文档与阅读",
             @"group_images": @"图片", @"group_media": @"音频与视频",
             @"group_archives": @"压缩文件", @"group_custom": @"自定义"
         },
@@ -113,8 +113,8 @@ static NSString * const OGLanguageDefaultsKey = @"languageCode";
             @"group_status": @"%lu 件保護 · %lu/%lu 件設定",
             @"choose_group_app": @"「%@」の共通アプリを選択",
             @"group_summary": @"%lu グループ · %lu/%lu 件保護 · %lu 回復元",
-            @"group_documents": @"文書とテキスト", @"group_data": @"データと設定",
-            @"group_web": @"Web 開発", @"group_source": @"ソースコード",
+            @"group_developer_text": @"テキストとソースコード",
+            @"group_documents": @"文書と閲覧",
             @"group_images": @"画像", @"group_media": @"音声と動画",
             @"group_archives": @"アーカイブ", @"group_custom": @"カスタム"
         },
@@ -136,8 +136,8 @@ static NSString * const OGLanguageDefaultsKey = @"languageCode";
             @"group_status": @"%lu개 보호 · %lu/%lu개 설정",
             @"choose_group_app": @"%@ 그룹의 공통 앱 선택",
             @"group_summary": @"%lu개 그룹 · %lu/%lu개 규칙 보호 · %lu회 복원",
-            @"group_documents": @"문서 및 텍스트", @"group_data": @"데이터 및 설정",
-            @"group_web": @"웹 개발", @"group_source": @"소스 코드",
+            @"group_developer_text": @"텍스트 및 소스 코드",
+            @"group_documents": @"문서 및 읽기",
             @"group_images": @"이미지", @"group_media": @"오디오 및 비디오",
             @"group_archives": @"압축 파일", @"group_custom": @"사용자 지정"
         },
@@ -159,8 +159,8 @@ static NSString * const OGLanguageDefaultsKey = @"languageCode";
             @"group_status": @"%lu protegidas · %lu/%lu configuradas",
             @"choose_group_app": @"Elige una aplicación para %@",
             @"group_summary": @"%lu grupos · %lu/%lu reglas protegidas · %lu restauraciones",
-            @"group_documents": @"Documentos y texto", @"group_data": @"Datos y configuración",
-            @"group_web": @"Desarrollo web", @"group_source": @"Código fuente",
+            @"group_developer_text": @"Texto y código fuente",
+            @"group_documents": @"Documentos y lectura",
             @"group_images": @"Imágenes", @"group_media": @"Audio y vídeo",
             @"group_archives": @"Archivos comprimidos", @"group_custom": @"Personalizado"
         }

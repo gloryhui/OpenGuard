@@ -5,12 +5,14 @@ assigned to the applications you choose. If another application hijacks a
 default handler, OpenGuard restores your rule automatically.
 
 The first launch creates a `.md → Visual Studio Code` rule when VS Code is
-installed. Existing v1 rules are migrated automatically into the grouped table.
+installed. Existing flat and grouped rules are migrated automatically when the
+default group structure changes.
 
 ## Highlights
 
 - Five switchable UI languages: 简体中文, English, 日本語, 한국어, and Español
-- 33 built-in extension presets organized into seven removable groups
+- 33 built-in extension presets organized into five removable groups
+- Programmer-friendly text and source-code group for assigning Markdown, plain text, configuration, web, and source files to one editor
 - Assign one application to a whole group or override individual extensions
 - Restore the original group structure at any time without losing mappings in groups that still exist
 - Automatic restoration every ten seconds
