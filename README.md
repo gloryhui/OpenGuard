@@ -7,6 +7,13 @@ default handler, OpenGuard restores your rule automatically.
 The first launch creates a `.md → Visual Studio Code` rule when VS Code is
 installed. Add, replace, or remove rules from the OpenGuard window.
 
+## Highlights
+
+- Five switchable UI languages: 简体中文, English, 日本語, 한국어, and Español
+- 33 built-in extension presets, plus a custom extension option
+- Automatic restoration every ten seconds
+- Optional login launch without administrator privileges
+
 ## Compatibility
 
 - macOS 10.13 High Sierra or later
@@ -59,5 +66,7 @@ requested, creates only this login-agent file:
 
 ## License
 
-MIT
-
+Source-available under the
+[PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0).
+You may inspect, modify, fork, and redistribute OpenGuard for noncommercial
+purposes. Commercial use is not permitted by this license.

@@ -29,14 +29,14 @@ verify: app
 	@codesign --verify --deep --strict --verbose=2 "$(APP_DIR)"
 	@plutil -lint "$(CONTENTS_DIR)/Info.plist"
 	@"$(MACOS_DIR)/$(APP_NAME)" --diagnose md
+	@"$(MACOS_DIR)/$(APP_NAME)" --verify-content
 
 package: verify
 	@mkdir -p dist
-	ditto -c -k --sequesterRsrc --keepParent "$(APP_DIR)" "dist/$(APP_NAME)-1.0.0-universal.zip"
+	ditto -c -k --sequesterRsrc --keepParent "$(APP_DIR)" "dist/$(APP_NAME)-1.1.0-universal.zip"
 
 run: app
 	open "$(APP_DIR)"
 
 clean:
 	rm -rf "$(BUILD_DIR)" dist
-

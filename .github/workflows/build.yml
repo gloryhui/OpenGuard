@@ -16,5 +16,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: OpenGuard-universal
-          path: dist/OpenGuard-1.0.0-universal.zip
-
+          path: dist/OpenGuard-1.1.0-universal.zip

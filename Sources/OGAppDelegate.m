@@ -2,15 +2,23 @@
 #import "OGLaunchAgent.h"
 #import "OGLaunchServices.h"
 #import "OGRuleStore.h"
+#import "OGLanguage.h"
+#import "OGPresets.h"
 
 @interface OGAppDelegate ()
 @property (nonatomic, strong) OGRuleStore *store;
+@property (nonatomic, strong) OGLanguage *language;
 @property (nonatomic, strong) NSStatusItem *statusItem;
 @property (nonatomic, strong) NSWindow *window;
 @property (nonatomic, strong) NSTableView *tableView;
 @property (nonatomic, strong) NSTextField *summaryLabel;
 @property (nonatomic, strong) NSButton *monitoringCheckbox;
 @property (nonatomic, strong) NSButton *loginCheckbox;
+@property (nonatomic, strong) NSTextField *titleLabel;
+@property (nonatomic, strong) NSButton *addButton;
+@property (nonatomic, strong) NSButton *removeButton;
+@property (nonatomic, strong) NSButton *applyButton;
+@property (nonatomic, strong) NSPopUpButton *languagePopup;
 @property (nonatomic, strong) NSTimer *timer;
 @property (nonatomic, copy) NSArray<NSString *> *statuses;
 @property (nonatomic) NSUInteger repairCount;
@@ -22,6 +30,7 @@
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     self.agentLaunch = [[[NSProcessInfo processInfo] arguments] containsObject:@"--agent"];
     self.store = [[OGRuleStore alloc] init];
+    self.language = [OGLanguage shared];
     self.statuses = @[];
     [self buildStatusItem];
     [self buildWindow];
@@ -43,12 +52,12 @@
 - (void)buildStatusItem {
     self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
     self.statusItem.button.title = @"◉";
-    self.statusItem.button.toolTip = @"OpenGuard — default app protection";
+    self.statusItem.button.toolTip = [self.language text:@"tagline"];
     NSMenu *menu = [[NSMenu alloc] initWithTitle:@"OpenGuard"];
-    [menu addItemWithTitle:@"Open OpenGuard…" action:@selector(showWindow:) keyEquivalent:@""];
-    [menu addItemWithTitle:@"Apply Rules Now" action:@selector(applyNow:) keyEquivalent:@""];
+    [menu addItemWithTitle:[self.language text:@"menu_open"] action:@selector(showWindow:) keyEquivalent:@""];
+    [menu addItemWithTitle:[self.language text:@"menu_apply"] action:@selector(applyNow:) keyEquivalent:@""];
     [menu addItem:[NSMenuItem separatorItem]];
-    [menu addItemWithTitle:@"Quit OpenGuard" action:@selector(terminate:) keyEquivalent:@"q"];
+    [menu addItemWithTitle:[self.language text:@"menu_quit"] action:@selector(terminate:) keyEquivalent:@"q"];
     for (NSMenuItem *item in menu.itemArray) item.target = self;
     self.statusItem.menu = menu;
 }
@@ -80,9 +89,9 @@
     [self.window center];
 
     NSView *content = self.window.contentView;
-    NSTextField *title = [self labelWithText:@"Default apps, held in place."
-                                        font:[NSFont boldSystemFontOfSize:22]];
-    self.summaryLabel = [self labelWithText:@"Checking rules…" font:[NSFont systemFontOfSize:13]];
+    self.titleLabel = [self labelWithText:[self.language text:@"tagline"]
+                                    font:[NSFont boldSystemFontOfSize:22]];
+    self.summaryLabel = [self labelWithText:[self.language text:@"checking"] font:[NSFont systemFontOfSize:13]];
     self.summaryLabel.textColor = [NSColor secondaryLabelColor];
 
     NSScrollView *scroll = [[NSScrollView alloc] initWithFrame:NSZeroRect];
@@ -96,48 +105,59 @@
     self.tableView.usesAlternatingRowBackgroundColors = YES;
     self.tableView.allowsMultipleSelection = NO;
     NSTableColumn *extensionColumn = [[NSTableColumn alloc] initWithIdentifier:@"extension"];
-    extensionColumn.title = @"Extension";
+    extensionColumn.title = [self.language text:@"extension"];
     extensionColumn.width = 110;
     NSTableColumn *applicationColumn = [[NSTableColumn alloc] initWithIdentifier:@"application"];
-    applicationColumn.title = @"Required application";
+    applicationColumn.title = [self.language text:@"application"];
     applicationColumn.width = 300;
     NSTableColumn *statusColumn = [[NSTableColumn alloc] initWithIdentifier:@"status"];
-    statusColumn.title = @"Status";
+    statusColumn.title = [self.language text:@"status"];
     statusColumn.width = 170;
     [self.tableView addTableColumn:extensionColumn];
     [self.tableView addTableColumn:applicationColumn];
     [self.tableView addTableColumn:statusColumn];
     scroll.documentView = self.tableView;
 
-    NSButton *add = [self buttonWithTitle:@"＋ Add Rule" action:@selector(addRule:)];
-    NSButton *remove = [self buttonWithTitle:@"－ Remove" action:@selector(removeRule:)];
-    NSButton *apply = [self buttonWithTitle:@"Apply All Now" action:@selector(applyNow:)];
-    self.monitoringCheckbox = [NSButton checkboxWithTitle:@"Automatically restore changed handlers"
+    self.addButton = [self buttonWithTitle:[self.language text:@"add_rule"] action:@selector(addRule:)];
+    self.removeButton = [self buttonWithTitle:[self.language text:@"remove"] action:@selector(removeRule:)];
+    self.applyButton = [self buttonWithTitle:[self.language text:@"apply_all"] action:@selector(applyNow:)];
+    self.monitoringCheckbox = [NSButton checkboxWithTitle:[self.language text:@"monitor_auto"]
                                                     target:self action:@selector(toggleMonitoring:)];
     self.monitoringCheckbox.translatesAutoresizingMaskIntoConstraints = NO;
     self.monitoringCheckbox.state = self.store.monitoringEnabled ? NSControlStateValueOn : NSControlStateValueOff;
-    self.loginCheckbox = [NSButton checkboxWithTitle:@"Start OpenGuard at login"
+    self.loginCheckbox = [NSButton checkboxWithTitle:[self.language text:@"start_login"]
                                                target:self action:@selector(toggleLogin:)];
     self.loginCheckbox.translatesAutoresizingMaskIntoConstraints = NO;
     self.loginCheckbox.state = [OGLaunchAgent isEnabled] ? NSControlStateValueOn : NSControlStateValueOff;
 
-    for (NSView *view in @[title, self.summaryLabel, scroll, add, remove, apply,
-                           self.monitoringCheckbox, self.loginCheckbox]) {
+    NSTextField *languageLabel = [self labelWithText:[self.language text:@"language"] font:[NSFont systemFontOfSize:12]];
+    self.languagePopup = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];
+    self.languagePopup.translatesAutoresizingMaskIntoConstraints = NO;
+    for (NSDictionary *entry in [OGLanguage supportedLanguages]) {
+        [self.languagePopup addItemWithTitle:entry[@"name"]];
+        self.languagePopup.lastItem.representedObject = entry[@"code"];
+        if ([entry[@"code"] isEqualToString:self.language.code]) [self.languagePopup selectItem:self.languagePopup.lastItem];
+    }
+    self.languagePopup.target = self;
+    self.languagePopup.action = @selector(changeLanguage:);
+
+    for (NSView *view in @[self.titleLabel, self.summaryLabel, scroll, self.addButton, self.removeButton, self.applyButton,
+                           self.monitoringCheckbox, self.loginCheckbox, languageLabel, self.languagePopup]) {
         [content addSubview:view];
     }
-    NSDictionary *views = NSDictionaryOfVariableBindings(title, _summaryLabel, scroll, add, remove, apply,
-                                                           _monitoringCheckbox, _loginCheckbox);
-    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[title]-24-|"
+    NSDictionary *views = NSDictionaryOfVariableBindings(_titleLabel, _summaryLabel, scroll, _addButton, _removeButton, _applyButton,
+                                                           _monitoringCheckbox, _loginCheckbox, languageLabel, _languagePopup);
+    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[_titleLabel]-(>=12)-[languageLabel]-6-[_languagePopup]-24-|"
                                                                     options:0 metrics:nil views:views]];
     [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[_summaryLabel]-24-|"
                                                                     options:0 metrics:nil views:views]];
     [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[scroll]-24-|"
                                                                     options:0 metrics:nil views:views]];
-    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[add]-8-[remove]-(>=8)-[apply]-24-|"
+    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[_addButton]-8-[_removeButton]-(>=8)-[_applyButton]-24-|"
                                                                     options:NSLayoutFormatAlignAllCenterY metrics:nil views:views]];
     [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"H:|-24-[_monitoringCheckbox]-(>=12)-[_loginCheckbox]-24-|"
                                                                     options:NSLayoutFormatAlignAllCenterY metrics:nil views:views]];
-    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|-22-[title]-4-[_summaryLabel]-14-[scroll]-14-[add]-14-[_monitoringCheckbox]-20-|"
+    [content addConstraints:[NSLayoutConstraint constraintsWithVisualFormat:@"V:|-22-[_titleLabel]-4-[_summaryLabel]-14-[scroll]-14-[_addButton]-14-[_monitoringCheckbox]-20-|"
                                                                     options:0 metrics:nil views:views]];
 }
 
@@ -172,31 +192,51 @@
     }
     cell.stringValue = value ?: @"";
     if ([tableColumn.identifier isEqualToString:@"status"]) {
-        cell.textColor = [value hasPrefix:@"Protected"] ? [NSColor systemGreenColor] : [NSColor secondaryLabelColor];
+        BOOL healthy = [value isEqualToString:[self.language text:@"protected"]]
+            || [value isEqualToString:[self.language text:@"restored"]];
+        cell.textColor = healthy ? [NSColor systemGreenColor] : [NSColor secondaryLabelColor];
     }
     return cell;
 }
 
 - (void)addRule:(id)sender {
     NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = @"Add a filename extension";
-    alert.informativeText = @"Enter an extension, with or without the leading dot.";
-    [alert addButtonWithTitle:@"Choose Application…"];
-    [alert addButtonWithTitle:@"Cancel"];
-    NSTextField *field = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 280, 24)];
-    field.placeholderString = @"md";
-    alert.accessoryView = field;
-    [alert.window setInitialFirstResponder:field];
+    alert.messageText = [self.language text:@"add_title"];
+    alert.informativeText = [self.language text:@"add_info"];
+    [alert addButtonWithTitle:[self.language text:@"choose_app"]];
+    [alert addButtonWithTitle:[self.language text:@"cancel"]];
+    NSPopUpButton *presetPopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(0, 0, 320, 26) pullsDown:NO];
+    for (NSDictionary *preset in [OGPresets all]) {
+        [presetPopup addItemWithTitle:[NSString stringWithFormat:@".%@ — %@", preset[@"extension"], preset[@"name"]]];
+        presetPopup.lastItem.representedObject = preset[@"extension"];
+    }
+    [presetPopup.menu addItem:[NSMenuItem separatorItem]];
+    [presetPopup addItemWithTitle:[self.language text:@"custom"]];
+    presetPopup.lastItem.representedObject = @"__custom__";
+    alert.accessoryView = presetPopup;
     if ([alert runModal] != NSAlertFirstButtonReturn) return;
-    NSString *extension = [OGLaunchServices normalizedExtension:field.stringValue];
+    NSString *extension = presetPopup.selectedItem.representedObject;
+    if ([extension isEqualToString:@"__custom__"]) {
+        NSAlert *customAlert = [[NSAlert alloc] init];
+        customAlert.messageText = [self.language text:@"custom_title"];
+        customAlert.informativeText = [self.language text:@"custom_info"];
+        [customAlert addButtonWithTitle:[self.language text:@"choose_app"]];
+        [customAlert addButtonWithTitle:[self.language text:@"cancel"]];
+        NSTextField *field = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 280, 24)];
+        field.placeholderString = @"md";
+        customAlert.accessoryView = field;
+        [customAlert.window setInitialFirstResponder:field];
+        if ([customAlert runModal] != NSAlertFirstButtonReturn) return;
+        extension = [OGLaunchServices normalizedExtension:field.stringValue];
+    }
     if (!extension) {
-        [self showErrorText:@"Please enter a valid extension using letters or numbers only."];
+        [self showErrorText:[self.language text:@"invalid_extension"]];
         return;
     }
 
     NSOpenPanel *panel = [NSOpenPanel openPanel];
-    panel.title = [NSString stringWithFormat:@"Choose the application for .%@ files", extension];
-    panel.prompt = @"Choose";
+    panel.title = [NSString stringWithFormat:[self.language text:@"choose_title"], extension];
+    panel.prompt = [self.language text:@"choose"];
     panel.directoryURL = [NSURL fileURLWithPath:@"/Applications" isDirectory:YES];
     panel.canChooseFiles = YES;
     panel.canChooseDirectories = NO;
@@ -207,7 +247,7 @@
     NSBundle *bundle = [NSBundle bundleWithURL:url];
     NSString *bundleID = bundle.bundleIdentifier;
     if (!bundleID) {
-        [self showErrorText:@"The selected item is not a valid macOS application."];
+        [self showErrorText:[self.language text:@"invalid_app"]];
         return;
     }
     NSString *name = [bundle objectForInfoDictionaryKey:@"CFBundleDisplayName"]
@@ -242,30 +282,30 @@
         NSString *wanted = rule[OGRuleBundleIdentifierKey];
         NSString *current = [OGLaunchServices currentHandlerForExtension:extension];
         if ([current isEqualToString:wanted]) {
-            [statuses addObject:@"Protected ✓"];
+            [statuses addObject:[self.language text:@"protected"]];
             protectedCount++;
             continue;
         }
         if (repair) {
             NSError *error = nil;
             if ([OGLaunchServices setHandler:wanted forExtension:extension error:&error]) {
-                [statuses addObject:@"Restored ✓"];
+                [statuses addObject:[self.language text:@"restored"]];
                 protectedCount++;
                 self.repairCount++;
                 NSLog(@"Restored .%@ to %@ (previous handler: %@)", extension, wanted, current ?: @"none");
             } else {
-                [statuses addObject:@"Repair failed"];
+                [statuses addObject:[self.language text:@"repair_failed"]];
                 NSLog(@"Failed to restore .%@: %@", extension, error);
             }
         } else {
-            NSString *name = current ? [OGLaunchServices applicationNameForBundleIdentifier:current] : @"None";
-            [statuses addObject:[NSString stringWithFormat:@"Changed: %@", name]];
+            NSString *name = current ? [OGLaunchServices applicationNameForBundleIdentifier:current] : [self.language text:@"none"];
+            [statuses addObject:[NSString stringWithFormat:[self.language text:@"changed"], name]];
         }
     }
     self.statuses = statuses;
     self.summaryLabel.stringValue = self.store.rules.count == 0
-        ? @"No rules yet. Add one to start protecting a file type."
-        : [NSString stringWithFormat:@"%lu of %lu rules protected · %lu automatic restorations this run",
+        ? [self.language text:@"no_rules"]
+        : [NSString stringWithFormat:[self.language text:@"summary"],
            (unsigned long)protectedCount, (unsigned long)self.store.rules.count,
            (unsigned long)self.repairCount];
     self.statusItem.button.title = protectedCount == self.store.rules.count ? @"◉" : @"!";
@@ -300,8 +340,18 @@
     NSError *error = nil;
     if (![OGLaunchAgent setEnabled:enabled error:&error]) {
         sender.state = enabled ? NSControlStateValueOff : NSControlStateValueOn;
-        [self showErrorText:error.localizedDescription ?: @"Unable to update the login item."];
+        [self showErrorText:error.localizedDescription ?: [self.language text:@"login_error"]];
     }
+}
+
+- (void)changeLanguage:(NSPopUpButton *)sender {
+    self.language.code = sender.selectedItem.representedObject;
+    [self.window orderOut:nil];
+    [[NSStatusBar systemStatusBar] removeStatusItem:self.statusItem];
+    [self buildStatusItem];
+    [self buildWindow];
+    [self refreshAndRepair:NO];
+    [self showWindow:nil];
 }
 
 - (void)showErrorText:(NSString *)text {
@@ -313,4 +363,3 @@
 }
 
 @end
-
