@@ -359,8 +359,8 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
                                  : [NSString stringWithFormat:@".%@  —  %@", item[OGRuleExtensionKey], item[OGRuleNameKey]];
         if (group) {
             cell.font = [NSFont boldSystemFontOfSize:13];
-            cell.editable = YES;
-            cell.selectable = YES;
+            cell.editable = NO;
+            cell.selectable = NO;
             cell.delegate = self;
             cell.identifier = @"groupTitle";
         }
@@ -485,7 +485,18 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
              proposedChildIndex:(NSInteger)index {
     NSDictionary *payload = [self dragPayloadFromInfo:info];
     if ([payload[@"kind"] isEqualToString:@"group"]) {
-        return item == nil && index >= 0 ? NSDragOperationMove : NSDragOperationNone;
+        if (!item) return index >= 0 ? NSDragOperationMove : NSDragOperationNone;
+        // A group cannot be nested. Convert drops over rows (including children
+        // of expanded groups) to a root insertion before/after the target group.
+        NSDictionary *rootItem = [outlineView parentForItem:item] ?: item;
+        NSUInteger targetIndex = [self.store.rootItems indexOfObject:rootItem];
+        NSDictionary *source = [self.store groupWithIdentifier:payload[@"identifier"]];
+        NSUInteger sourceIndex = source ? [self.store.rootItems indexOfObject:source] : NSNotFound;
+        if (targetIndex == NSNotFound || sourceIndex == NSNotFound || sourceIndex == targetIndex)
+            return NSDragOperationNone;
+        NSInteger insertion = (NSInteger)targetIndex + (sourceIndex < targetIndex ? 1 : 0);
+        [outlineView setDropItem:nil dropChildIndex:insertion];
+        return NSDragOperationMove;
     }
     if (![payload[@"kind"] isEqualToString:@"rule"]) return NSDragOperationNone;
     if (item && ![self isGroup:item]) return NSDragOperationNone;
@@ -521,6 +532,17 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 
 #pragma mark - Group and application actions
 
+- (void)beginEditingGroupAtRow:(NSInteger)row {
+    if (row < 0 || row >= self.outlineView.numberOfRows) return;
+    NSDictionary *item = [self.outlineView itemAtRow:row];
+    if (![self isGroup:item]) return;
+    NSTextField *field = [self.outlineView viewAtColumn:0 row:row makeIfNecessary:YES];
+    field.editable = YES;
+    field.selectable = YES;
+    [self.window makeFirstResponder:self.outlineView];
+    [self.outlineView editColumn:0 row:row withEvent:nil select:YES];
+}
+
 - (NSInteger)contextRow {
     NSInteger clickedRow = self.outlineView.clickedRow;
     return clickedRow >= 0 ? clickedRow : self.outlineView.selectedRow;
@@ -554,8 +576,7 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
                      byExtendingSelection:NO];
         [self.outlineView scrollRowToVisible:row];
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self.window makeFirstResponder:self.outlineView];
-            [self.outlineView editColumn:0 row:row withEvent:nil select:YES];
+            [self beginEditingGroupAtRow:row];
         });
     }
     [self refreshAndRepair:NO];
@@ -567,8 +588,7 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
     [self.outlineView selectRowIndexes:[NSIndexSet indexSetWithIndex:(NSUInteger)row]
                  byExtendingSelection:NO];
     dispatch_async(dispatch_get_main_queue(), ^{
-        [self.window makeFirstResponder:self.outlineView];
-        [self.outlineView editColumn:0 row:row withEvent:nil select:YES];
+        [self beginEditingGroupAtRow:row];
     });
 }
 
