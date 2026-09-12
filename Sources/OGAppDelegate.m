@@ -11,7 +11,7 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
 @property OGRuleStore *store;
 @property OGLanguage *language;
 @property NSStatusItem *statusItem;
-@property NSWindow *window;
+@property (nonatomic, strong) NSWindow *window;
 @property NSOutlineView *outlineView;
 @property NSTextField *summaryLabel;
 @property NSButton *monitoringCheckbox;
@@ -58,6 +58,10 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     if (self.store.monitoringEnabled) [self refreshAndRepair:YES];
 }
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender { return NO; }
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)hasVisibleWindows {
+    if (!hasVisibleWindows) [self showWindow:nil];
+    return YES;
+}
 
 - (void)buildStatusItem {
     self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
@@ -148,6 +152,7 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
                                                 backing:NSBackingStoreBuffered defer:NO];
     self.window.title = @"OpenGuard";
     self.window.minSize = NSMakeSize(680, 460);
+    self.window.releasedWhenClosed = NO;
     [self.window center];
     NSView *content = self.window.contentView;
 
@@ -227,7 +232,11 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     [self expandAllGroups];
 }
 
-- (void)showWindow:(id)sender { [NSApp activateIgnoringOtherApps:YES]; [self.window makeKeyAndOrderFront:nil]; }
+- (void)showWindow:(id)sender {
+    NSWindow *window = self.window;
+    [NSApp activateIgnoringOtherApps:YES];
+    [window makeKeyAndOrderFront:nil];
+}
 - (void)expandAllGroups { for (NSDictionary *group in self.store.groups) [self.outlineView expandItem:group]; }
 - (NSSet<NSString *> *)expandedGroupIdentifiers {
     NSMutableSet *identifiers = [NSMutableSet set];

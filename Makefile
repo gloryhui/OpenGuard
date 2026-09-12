@@ -11,9 +11,11 @@ DMG_PATH := dist/$(APP_NAME)-$(VERSION)-universal.dmg
 CHECKSUM_PATH := dist/SHA256SUMS.txt
 SOURCES := $(wildcard Sources/*.m)
 HEADERS := $(wildcard Sources/*.h)
+APP_SOURCES := $(filter-out Sources/main.m,$(SOURCES))
+WINDOW_TEST := $(BUILD_DIR)/OpenGuardWindowLifecycleTest
 MIN_MACOS := 10.13
 
-.PHONY: all app clean verify package run
+.PHONY: all app clean verify test-window-lifecycle package run
 
 all: app
 
@@ -30,7 +32,18 @@ $(MACOS_DIR)/$(APP_NAME): $(SOURCES) $(HEADERS) Resources/Info.plist Resources/O
 		$(SOURCES) -o "$@"
 	codesign --force --sign - --timestamp=none "$(APP_DIR)"
 
-verify: app
+$(WINDOW_TEST): Tests/OGWindowLifecycleTest.m $(APP_SOURCES) $(HEADERS)
+	@mkdir -p "$(BUILD_DIR)"
+	xcrun clang -fobjc-arc -fmodules -Wall -Wextra -Werror \
+		-Wno-deprecated-declarations -Wno-unused-parameter \
+		-I Sources -mmacosx-version-min=$(MIN_MACOS) \
+		-framework Cocoa -framework CoreServices \
+		$(APP_SOURCES) Tests/OGWindowLifecycleTest.m -o "$@"
+
+test-window-lifecycle: $(WINDOW_TEST)
+	@"$(WINDOW_TEST)"
+
+verify: app test-window-lifecycle
 	@file "$(MACOS_DIR)/$(APP_NAME)"
 	@codesign --verify --deep --strict --verbose=2 "$(APP_DIR)"
 	@plutil -lint "$(CONTENTS_DIR)/Info.plist"
