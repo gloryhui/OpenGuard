@@ -61,8 +61,7 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
 
 - (void)buildStatusItem {
     self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
-    self.statusItem.button.title = @"◉";
-    self.statusItem.button.toolTip = [self.language text:@"tagline"];
+    [self updateStatusItemWithWarning:NO];
     NSMenu *menu = [[NSMenu alloc] initWithTitle:@"OpenGuard"];
     [menu addItemWithTitle:[self.language text:@"menu_open"] action:@selector(showWindow:) keyEquivalent:@""];
     [menu addItemWithTitle:[self.language text:@"menu_apply"] action:@selector(applyNow:) keyEquivalent:@""];
@@ -73,6 +72,59 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     for (NSMenuItem *item in menu.itemArray) item.target = self;
     quitItem.target = NSApp;
     self.statusItem.menu = menu;
+}
+
+- (NSImage *)statusImageWithWarning:(BOOL)warning {
+    NSImage *image = [NSImage imageWithSize:NSMakeSize(18, 18)
+                                    flipped:NO
+                             drawingHandler:^BOOL(NSRect destinationRect) {
+        [[NSColor blackColor] setStroke];
+        NSBezierPath *shield = [NSBezierPath bezierPath];
+        [shield moveToPoint:NSMakePoint(9.0, 16.4)];
+        [shield lineToPoint:NSMakePoint(15.1, 13.8)];
+        [shield lineToPoint:NSMakePoint(14.8, 8.2)];
+        [shield curveToPoint:NSMakePoint(9.0, 1.6)
+               controlPoint1:NSMakePoint(14.5, 5.0)
+               controlPoint2:NSMakePoint(11.7, 2.6)];
+        [shield curveToPoint:NSMakePoint(3.2, 8.2)
+               controlPoint1:NSMakePoint(6.3, 2.6)
+               controlPoint2:NSMakePoint(3.5, 5.0)];
+        [shield lineToPoint:NSMakePoint(2.9, 13.8)];
+        [shield closePath];
+        shield.lineWidth = 1.5;
+        shield.lineJoinStyle = NSRoundLineJoinStyle;
+        [shield stroke];
+
+        if (warning) {
+            NSBezierPath *mark = [NSBezierPath bezierPath];
+            [mark moveToPoint:NSMakePoint(9.0, 11.9)];
+            [mark lineToPoint:NSMakePoint(9.0, 7.0)];
+            mark.lineWidth = 1.7;
+            mark.lineCapStyle = NSRoundLineCapStyle;
+            [mark stroke];
+            [[NSColor blackColor] setFill];
+            [[NSBezierPath bezierPathWithOvalInRect:NSMakeRect(8.1, 4.3, 1.8, 1.8)] fill];
+        } else {
+            NSBezierPath *check = [NSBezierPath bezierPath];
+            [check moveToPoint:NSMakePoint(5.8, 8.7)];
+            [check lineToPoint:NSMakePoint(8.0, 6.5)];
+            [check lineToPoint:NSMakePoint(12.5, 11.2)];
+            check.lineWidth = 1.7;
+            check.lineCapStyle = NSRoundLineCapStyle;
+            check.lineJoinStyle = NSRoundLineJoinStyle;
+            [check stroke];
+        }
+        return YES;
+    }];
+    image.template = YES;
+    return image;
+}
+
+- (void)updateStatusItemWithWarning:(BOOL)warning {
+    self.statusItem.button.image = [self statusImageWithWarning:warning];
+    self.statusItem.button.imagePosition = NSImageOnly;
+    self.statusItem.button.title = @"";
+    self.statusItem.button.toolTip = [self.language text:(warning ? @"menu_status_attention" : @"menu_status_protected")];
 }
 
 - (NSTextField *)label:(NSString *)text font:(NSFont *)font {
@@ -379,7 +431,7 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     self.summaryLabel.stringValue = [NSString stringWithFormat:[self.language text:@"group_summary"],
                                      (unsigned long)self.store.groups.count, (unsigned long)protectedCount,
                                      (unsigned long)rules.count, (unsigned long)self.repairCount];
-    self.statusItem.button.title = protectedCount == rules.count ? @"◉" : @"!";
+    [self updateStatusItemWithWarning:protectedCount != rules.count];
     NSInteger rowCount = self.outlineView.numberOfRows;
     if (rowCount > 0) {
         [self.outlineView reloadDataForRowIndexes:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, rowCount)]
