@@ -152,6 +152,20 @@
 
 - (void)showWindow:(id)sender { [NSApp activateIgnoringOtherApps:YES]; [self.window makeKeyAndOrderFront:nil]; }
 - (void)expandAllGroups { for (NSDictionary *group in self.store.groups) [self.outlineView expandItem:group]; }
+- (NSSet<NSString *> *)expandedGroupIdentifiers {
+    NSMutableSet *identifiers = [NSMutableSet set];
+    for (NSDictionary *group in self.store.groups) {
+        if ([self.outlineView isItemExpanded:group]) [identifiers addObject:group[OGGroupIdentifierKey]];
+    }
+    return identifiers;
+}
+- (void)reloadOutlineWithExpandedGroupIdentifiers:(NSSet<NSString *> *)identifiers {
+    [self.outlineView reloadData];
+    for (NSDictionary *group in self.store.groups) {
+        if ([identifiers containsObject:group[OGGroupIdentifierKey]]) [self.outlineView expandItem:group];
+        else [self.outlineView collapseItem:group];
+    }
+}
 - (BOOL)isGroup:(NSDictionary *)item { return item[OGGroupItemsKey] != nil; }
 
 #pragma mark - Outline table
@@ -258,6 +272,7 @@
     NSDictionary *application = @{OGRuleBundleIdentifierKey: bundle.bundleIdentifier,
                                    OGRuleApplicationNameKey: name,
                                    OGRuleApplicationPathKey: panel.URL.path};
+    NSSet<NSString *> *expandedGroups = [self expandedGroupIdentifiers];
     if (group) {
         [self.store setApplication:application forGroup:item[OGGroupIdentifierKey]];
     } else {
@@ -265,8 +280,7 @@
         [self.store setApplication:application forExtension:item[OGRuleExtensionKey]
                                                    inGroup:parent[OGGroupIdentifierKey]];
     }
-    [self.outlineView reloadData];
-    [self expandAllGroups];
+    [self reloadOutlineWithExpandedGroupIdentifiers:expandedGroups];
     [self refreshAndRepair:YES];
 }
 
