@@ -1,4 +1,5 @@
 #import "OGAppDelegate.h"
+#import "OGApplicationPicker.h"
 #import "OGLaunchAgent.h"
 #import "OGLaunchServices.h"
 #import "OGRuleStore.h"
@@ -269,30 +270,21 @@ static const NSTimeInterval OGMonitoringInterval = 3.0;
     if (row < 0) return;
     NSDictionary *item = [self.outlineView itemAtRow:row];
     BOOL group = [self isGroup:item];
-    NSOpenPanel *panel = [NSOpenPanel openPanel];
-    panel.title = group ? [NSString stringWithFormat:[self.language text:@"choose_group_app"],
-                           [self.language text:item[OGGroupTitleKey]]]
-                        : [NSString stringWithFormat:[self.language text:@"choose_title"], item[OGRuleExtensionKey]];
-    panel.prompt = [self.language text:@"choose"];
-    panel.directoryURL = [NSURL fileURLWithPath:@"/Applications" isDirectory:YES];
-    panel.canChooseFiles = YES;
-    panel.canChooseDirectories = NO;
-    panel.allowsMultipleSelection = NO;
-    panel.allowedFileTypes = @[@"app"];
-    if ([panel runModal] != NSModalResponseOK) return;
-    NSBundle *bundle = [NSBundle bundleWithURL:panel.URL];
-    if (!bundle.bundleIdentifier) { [self showError:[self.language text:@"invalid_app"]]; return; }
-    NSString *name = [bundle objectForInfoDictionaryKey:@"CFBundleDisplayName"]
-        ?: [bundle objectForInfoDictionaryKey:@"CFBundleName"]
-        ?: [[panel.URL lastPathComponent] stringByDeletingPathExtension];
-    NSDictionary *application = @{OGRuleBundleIdentifierKey: bundle.bundleIdentifier,
-                                   OGRuleApplicationNameKey: name,
-                                   OGRuleApplicationPathKey: panel.URL.path};
+    NSString *title = group ? [NSString stringWithFormat:[self.language text:@"choose_group_app"],
+                               [self.language text:item[OGGroupTitleKey]]]
+                            : [NSString stringWithFormat:[self.language text:@"choose_title"],
+                               item[OGRuleExtensionKey]];
+    NSDictionary *parent = group ? nil : [self.outlineView parentForItem:item];
+    NSString *currentBundleIdentifier = item[OGRuleBundleIdentifierKey]
+        ?: parent[OGRuleBundleIdentifierKey];
+    OGApplicationPicker *picker = [[OGApplicationPicker alloc] initWithLanguage:self.language];
+    NSDictionary *application = [picker runWithTitle:title
+                             currentBundleIdentifier:currentBundleIdentifier];
+    if (!application) return;
     NSSet<NSString *> *expandedGroups = [self expandedGroupIdentifiers];
     if (group) {
         [self.store setApplication:application forGroup:item[OGGroupIdentifierKey]];
     } else {
-        NSDictionary *parent = [self.outlineView parentForItem:item];
         [self.store setApplication:application forExtension:item[OGRuleExtensionKey]
                                                    inGroup:parent[OGGroupIdentifierKey]];
     }
