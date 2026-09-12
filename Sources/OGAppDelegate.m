@@ -8,6 +8,31 @@
 static const NSTimeInterval OGMonitoringInterval = 3.0;
 static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outline-item";
 
+@interface OGRuleOutlineView : NSOutlineView
+@property (copy) void (^deleteSelection)(void);
+@end
+
+@implementation OGRuleOutlineView
+- (BOOL)performKeyEquivalent:(NSEvent *)event {
+    NSEventModifierFlags modifiers = event.modifierFlags & NSEventModifierFlagDeviceIndependentFlagsMask;
+    if (self.window.firstResponder == self && modifiers == NSEventModifierFlagCommand &&
+        [event.charactersIgnoringModifiers.lowercaseString isEqualToString:@"a"]) {
+        [self selectAll:nil];
+        return YES;
+    }
+    return [super performKeyEquivalent:event];
+}
+- (void)keyDown:(NSEvent *)event {
+    NSEventModifierFlags modifiers = event.modifierFlags &
+        (NSEventModifierFlagCommand | NSEventModifierFlagControl | NSEventModifierFlagOption | NSEventModifierFlagShift);
+    if (!modifiers && (event.keyCode == 51 || event.keyCode == 117)) {
+        if (self.deleteSelection) self.deleteSelection();
+        return;
+    }
+    [super keyDown:event];
+}
+@end
+
 @interface OGAppDelegate ()
 @property OGRuleStore *store;
 @property OGLanguage *language;
@@ -188,12 +213,15 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
     scroll.translatesAutoresizingMaskIntoConstraints = NO;
     scroll.hasVerticalScroller = YES;
     scroll.borderType = NSBezelBorder;
-    self.outlineView = [[NSOutlineView alloc] initWithFrame:NSZeroRect];
+    OGRuleOutlineView *outline = [[OGRuleOutlineView alloc] initWithFrame:NSZeroRect];
+    __weak typeof(self) weakSelf = self;
+    outline.deleteSelection = ^{ [weakSelf deleteSelectedItems:nil]; };
+    self.outlineView = outline;
     self.outlineView.dataSource = self;
     self.outlineView.delegate = self;
     self.outlineView.headerView = [[NSTableHeaderView alloc] initWithFrame:NSMakeRect(0, 0, 100, 25)];
     self.outlineView.usesAlternatingRowBackgroundColors = YES;
-    self.outlineView.allowsMultipleSelection = NO;
+    self.outlineView.allowsMultipleSelection = YES;
     self.outlineView.rowHeight = 28;
     [self.outlineView registerForDraggedTypes:@[OGOutlinePasteboardType]];
     [self.outlineView setDraggingSourceOperationMask:NSDragOperationMove forLocal:YES];
@@ -841,6 +869,38 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
         return;
     }
     [self cancelAddRule:nil];
+}
+
+- (void)deleteSelectedItems:(id)sender {
+    if (self.editingRuleIdentifier || self.editingGroupField.currentEditor || self.window.attachedSheet) return;
+    NSMutableSet<NSString *> *groupIDs = [NSMutableSet set];
+    NSMutableSet<NSString *> *ruleIDs = [NSMutableSet set];
+    [self.outlineView.selectedRowIndexes enumerateIndexesUsingBlock:^(NSUInteger row, BOOL *stop) {
+        NSDictionary *item = [self.outlineView itemAtRow:row];
+        if ([self isGroup:item]) {
+            [groupIDs addObject:item[OGGroupIdentifierKey]];
+            NSDictionary *group = [self.store groupWithIdentifier:item[OGGroupIdentifierKey]];
+            for (NSDictionary *rule in group[OGGroupItemsKey]) [ruleIDs addObject:rule[OGRuleIdentifierKey]];
+        } else if (item[OGRuleIdentifierKey]) {
+            [ruleIDs addObject:item[OGRuleIdentifierKey]];
+        }
+    }];
+    if (!groupIDs.count && !ruleIDs.count) return;
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.alertStyle = NSAlertStyleWarning;
+    alert.messageText = [self.language text:@"delete_selection_title"];
+    alert.informativeText = [NSString stringWithFormat:[self.language text:@"delete_selection_message"],
+                            (unsigned long)groupIDs.count, (unsigned long)ruleIDs.count];
+    [alert addButtonWithTitle:[self.language text:@"cancel"]];
+    [alert addButtonWithTitle:[self.language text:@"delete_selection_confirm"]];
+    [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse response) {
+        if (response != NSAlertSecondButtonReturn) return;
+        NSSet *expanded = [self expandedGroupIdentifiers];
+        for (NSString *identifier in groupIDs) [self.store removeGroupAndRules:identifier];
+        for (NSString *identifier in ruleIDs) [self.store removeRule:identifier];
+        [self reloadOutlineWithExpandedGroupIdentifiers:expanded];
+        [self refreshAndRepair:NO];
+    }];
 }
 
 - (void)deleteRule:(id)sender {

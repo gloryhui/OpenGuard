@@ -111,7 +111,47 @@ int main(void) {
                passed ? "5/5" : "failed",
                groupEditingStarted ? "yes" : "no", compositionPreserved ? "yes" : "no",
                completedNameSaved ? "yes" : "no");
+        [window makeFirstResponder:outlineView];
+        [outlineView reloadData];
+        [outlineView expandItem:nil expandChildren:YES];
+        NSEvent *selectAll = [NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint
+            modifierFlags:NSEventModifierFlagCommand timestamp:0 windowNumber:window.windowNumber
+            context:nil characters:@"a" charactersIgnoringModifiers:@"a" isARepeat:NO keyCode:0];
+        BOOL selectedAll = [outlineView performKeyEquivalent:selectAll] &&
+            outlineView.selectedRowIndexes.count == (NSUInteger)outlineView.numberOfRows;
+        NSEvent *deleteKey = [NSEvent keyEventWithType:NSEventTypeKeyDown location:NSZeroPoint
+            modifierFlags:0 timestamp:0 windowNumber:window.windowNumber context:nil
+            characters:@"\177" charactersIgnoringModifiers:@"\177" isARepeat:NO keyCode:51];
+        NSArray *beforeDeletion = store.rootItems;
+        NSUInteger groupsBeforeDeletion = store.groups.count;
+        NSInteger draftRow = -1;
+        for (NSInteger row = 0; row < outlineView.numberOfRows; row++) {
+            if ([[outlineView itemAtRow:row][OGRuleIdentifierKey] isEqualToString:draftID]) { draftRow = row; break; }
+        }
+        if (draftRow < 0) return 1;
+        [outlineView selectRowIndexes:[NSIndexSet indexSetWithIndex:draftRow] byExtendingSelection:NO];
+        [outlineView keyDown:deleteKey];
+        BOOL singlePrompt = window.attachedSheet != nil && [store.rootItems isEqual:beforeDeletion];
+        if (window.attachedSheet) [window endSheet:window.attachedSheet returnCode:NSAlertFirstButtonReturn];
+        [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.2]];
+        BOOL cancelledDeletion = [store ruleWithIdentifier:draftID] != nil;
+        [outlineView keyDown:deleteKey];
+        if (window.attachedSheet) [window endSheet:window.attachedSheet returnCode:NSAlertSecondButtonReturn];
+        [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.2]];
+        BOOL singleDeleted = [store ruleWithIdentifier:draftID] == nil && store.groups.count == groupsBeforeDeletion;
+        [outlineView collapseItem:nil collapseChildren:YES];
+        [window makeFirstResponder:outlineView];
+        BOOL batchSelected = [outlineView performKeyEquivalent:selectAll];
+        [outlineView keyDown:deleteKey];
+        BOOL batchPrompt = window.attachedSheet != nil;
+        if (window.attachedSheet) [window endSheet:window.attachedSheet returnCode:NSAlertSecondButtonReturn];
+        [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.2]];
+        BOOL batchDeleted = store.rootItems.count == 0;
+        BOOL keyboardPassed = selectedAll && singlePrompt && cancelledDeletion && singleDeleted && batchSelected && batchPrompt && batchDeleted;
+        printf("cmd_a_select_all=%s\nsingle_delete_confirmation=%s\ndelete_cancel_preserves_rules=%s\nsingle_delete_confirmed=%s\ncollapsed_groups_batch_delete=%s\n",
+            selectedAll ? "yes" : "no", singlePrompt ? "yes" : "no", cancelledDeletion ? "yes" : "no",
+            singleDeleted ? "yes" : "no", batchPrompt && batchDeleted ? "yes" : "no");
         [defaults removePersistentDomainForName:suiteName];
-        return passed && groupEditingStarted && compositionPreserved && completedNameSaved && ruleEditingPassed ? 0 : 1;
+        return passed && groupEditingStarted && compositionPreserved && completedNameSaved && ruleEditingPassed && keyboardPassed ? 0 : 1;
     }
 }
