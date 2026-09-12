@@ -1,5 +1,4 @@
 #import <Cocoa/Cocoa.h>
 
-@interface OGAppDelegate : NSObject <NSApplicationDelegate, NSTableViewDataSource, NSTableViewDelegate>
+@interface OGAppDelegate : NSObject <NSApplicationDelegate, NSOutlineViewDataSource, NSOutlineViewDelegate>
 @end
-

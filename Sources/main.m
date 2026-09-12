@@ -8,8 +8,9 @@ int main(int argc, const char * argv[]) {
     @autoreleasepool {
         NSArray<NSString *> *arguments = [[NSProcessInfo processInfo] arguments];
         if ([arguments containsObject:@"--verify-content"]) {
-            printf("languages=%lu\npresets=%lu\ntranslations_complete=%s\n",
+            printf("languages=%lu\ngroups=%lu\npresets=%lu\ntranslations_complete=%s\n",
                    (unsigned long)[OGLanguage supportedLanguages].count,
+                   (unsigned long)[OGPresets defaultGroups].count,
                    (unsigned long)[OGPresets all].count,
                    [[OGLanguage shared] hasCompleteTranslations] ? "yes" : "no");
             return [[OGLanguage shared] hasCompleteTranslations] ? 0 : 3;

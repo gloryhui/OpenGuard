@@ -5,12 +5,14 @@ assigned to the applications you choose. If another application hijacks a
 default handler, OpenGuard restores your rule automatically.
 
 The first launch creates a `.md → Visual Studio Code` rule when VS Code is
-installed. Add, replace, or remove rules from the OpenGuard window.
+installed. Existing v1 rules are migrated automatically into the grouped table.
 
 ## Highlights
 
 - Five switchable UI languages: 简体中文, English, 日本語, 한국어, and Español
-- 33 built-in extension presets, plus a custom extension option
+- 33 built-in extension presets organized into seven removable groups
+- Assign one application to a whole group or override individual extensions
+- Restore the original group structure at any time without losing mappings in groups that still exist
 - Automatic restoration every ten seconds
 - Optional login launch without administrator privileges
 
@@ -44,7 +46,8 @@ with an Apple Developer ID and notarized before distribution to other Macs.
 ## Usage
 
 1. Move `OpenGuard.app` to `/Applications`.
-2. Open it and add an extension/application rule.
+2. Click `…` on a group to assign one application to every extension in it, or
+   click `…` on an individual extension to set an override.
 3. Enable **Start OpenGuard at login** after moving the app.
 4. Leave automatic restoration enabled.
 
