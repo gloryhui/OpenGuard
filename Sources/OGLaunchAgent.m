@@ -30,9 +30,9 @@ static NSString * const OGAgentLabel = @"com.gloryhuis.OpenGuard.agent";
     NSDictionary *plist = @{ @"Label": OGAgentLabel,
                              @"ProgramArguments": @[executable, @"--agent"],
                              @"RunAtLoad": @YES,
+                             @"KeepAlive": @{@"SuccessfulExit": @NO},
                              @"ProcessType": @"Interactive" };
     return [plist writeToFile:path atomically:YES];
 }
 
 @end
-

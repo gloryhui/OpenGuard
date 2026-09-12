@@ -15,8 +15,8 @@ default group structure changes.
 - Programmer-friendly text and source-code group for assigning Markdown, plain text, configuration, web, and source files to one editor
 - Assign one application to a whole group or override individual extensions
 - Restore the original group structure at any time without losing mappings in groups that still exist
-- Automatic restoration every ten seconds
-- Optional login launch without administrator privileges
+- Automatic restoration every three seconds, plus immediate checks after wake and app activation
+- Optional login launch and abnormal-exit recovery without administrator privileges
 
 ## Compatibility
 
@@ -54,7 +54,8 @@ with an Apple Developer ID and notarized before distribution to other Macs.
 4. Leave automatic restoration enabled.
 
 The menu bar indicator remains active even after the settings window closes.
-OpenGuard checks rules every ten seconds.
+OpenGuard checks rules every three seconds and immediately after the Mac wakes or
+the app becomes active.
 
 ## Diagnostic command
 

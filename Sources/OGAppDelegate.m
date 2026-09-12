@@ -4,6 +4,8 @@
 #import "OGRuleStore.h"
 #import "OGLanguage.h"
 
+static const NSTimeInterval OGMonitoringInterval = 3.0;
+
 @interface OGAppDelegate ()
 @property OGRuleStore *store;
 @property OGLanguage *language;
@@ -27,6 +29,14 @@
     self.store = [[OGRuleStore alloc] init];
     self.language = [OGLanguage shared];
     self.statusByExtension = @{};
+    [[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self
+                                                           selector:@selector(workspaceDidWake:)
+                                                               name:NSWorkspaceDidWakeNotification
+                                                             object:nil];
+    if ([OGLaunchAgent isEnabled]) {
+        NSError *error = nil;
+        if (![OGLaunchAgent setEnabled:YES error:&error]) NSLog(@"Unable to refresh login agent: %@", error);
+    }
     [self buildStatusItem];
     [self buildWindow];
     [self refreshAndRepair:self.store.monitoringEnabled];
@@ -34,7 +44,13 @@
     if (!self.agentLaunch) [self showWindow:nil];
 }
 
-- (void)applicationWillTerminate:(NSNotification *)notification { [self.timer invalidate]; }
+- (void)applicationWillTerminate:(NSNotification *)notification {
+    [self.timer invalidate];
+    [[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self];
+}
+- (void)applicationDidBecomeActive:(NSNotification *)notification {
+    if (self.store.monitoringEnabled) [self refreshAndRepair:YES];
+}
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender { return NO; }
 
 - (void)buildStatusItem {
@@ -359,12 +375,15 @@
     [self.timer invalidate];
     self.timer = nil;
     if (!self.store.monitoringEnabled) return;
-    self.timer = [NSTimer scheduledTimerWithTimeInterval:10.0 target:self selector:@selector(timerFired:)
+    self.timer = [NSTimer scheduledTimerWithTimeInterval:OGMonitoringInterval target:self selector:@selector(timerFired:)
                                                 userInfo:nil repeats:YES];
-    self.timer.tolerance = 2.0;
+    self.timer.tolerance = 0.5;
 }
 
 - (void)timerFired:(NSTimer *)timer { [self refreshAndRepair:YES]; }
+- (void)workspaceDidWake:(NSNotification *)notification {
+    if (self.store.monitoringEnabled) [self refreshAndRepair:YES];
+}
 
 - (void)toggleLogin:(NSButton *)sender {
     BOOL enabled = sender.state == NSControlStateValueOn;
