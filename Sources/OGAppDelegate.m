@@ -52,6 +52,7 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
 @property NSTimer *timer;
 @property OGUpdateChecker *updateChecker;
 @property (copy) NSDictionary<NSString *, NSString *> *statusByExtension;
+@property BOOL statusTableReloadPending;
 @property NSUInteger repairCount;
 @property BOOL agentLaunch;
 @end
@@ -1017,7 +1018,9 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
             statuses[extension] = [NSString stringWithFormat:[self.language text:@"changed"], name];
         }
     }
+    BOOL statusChanged = ![self.statusByExtension isEqualToDictionary:statuses];
     self.statusByExtension = statuses;
+    if (statusChanged) self.statusTableReloadPending = YES;
     self.summaryLabel.stringValue = [NSString stringWithFormat:[self.language text:@"group_summary"],
                                      (unsigned long)self.store.groups.count, (unsigned long)protectedCount,
                                      (unsigned long)rules.count, (unsigned long)self.repairCount];
@@ -1026,11 +1029,13 @@ static NSString * const OGOutlinePasteboardType = @"com.gloryhuis.OpenGuard.outl
     // and commit unfinished IME marked text. Keep enforcing rules, but defer
     // table refreshes until the group-name edit has ended.
     if (self.editingGroupField.currentEditor || self.editingRuleIdentifier) return;
+    if (!self.statusTableReloadPending) return;
     NSInteger rowCount = self.outlineView.numberOfRows;
     if (rowCount > 0) {
         [self.outlineView reloadDataForRowIndexes:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, rowCount)]
                                    columnIndexes:[NSIndexSet indexSetWithIndex:[self.outlineView columnWithIdentifier:@"status"]]];
     }
+    self.statusTableReloadPending = NO;
 }
 
 #pragma mark - Settings
